@@ -1,0 +1,4 @@
+{
+    "cmake.configureOnOpen": false,
+    "python.formatting.autopep8Args": ["--max-line-length=88"]
+}

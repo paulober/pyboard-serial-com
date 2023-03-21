@@ -1,0 +1,2 @@
+{ "command": "command", "args": { "command": "print(5+2)" }}
+{ "command": "exit"}

@@ -1,0 +1,49 @@
+{
+    // Verwendet IntelliSense zum Ermitteln möglicher Attribute.
+    // Zeigen Sie auf vorhandene Attribute, um die zugehörigen Beschreibungen anzuzeigen.
+    // Weitere Informationen finden Sie unter https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Wrapper",
+            "type": "python",
+            "request": "launch",
+            "program": "wrapper.py",
+            "args": [
+                "-d", "COM3",
+                "-b", "115200"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "Python: Pyboard",
+            "type": "python",
+            "request": "launch",
+            "program": "pyboard.py",
+            "args": [
+                "-d", "COM3",
+                "-b", "115200",
+                "-f", "cp", 
+                ":project.pico-w-go", ":list_avail_modules.py", 
+                "C:\\Users\\paulo\\Downloads\\"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "Python: Wrapper - Scan",
+            "type": "python",
+            "request": "launch",
+            "program": "wrapper.py",
+            "args": [
+                "--scan-ports"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        }
+    ]
+}

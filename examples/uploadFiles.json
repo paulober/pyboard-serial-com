@@ -1,0 +1,9 @@
+{
+    "command": "upload_files",
+    "args": {
+        "files": [
+            "test.txt"
+        ],
+        "remote": "/test"
+    }
+}

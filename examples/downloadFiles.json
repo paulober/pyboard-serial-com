@@ -1,0 +1,11 @@
+{
+    "command": "download_files",
+    "args": {
+        "files": [
+            "test.txt",
+            "test2.txt",
+            "folder1/test3.txt"
+        ],
+        "local": "C:\\test"
+    }
+}

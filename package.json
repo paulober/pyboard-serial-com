@@ -1,0 +1,31 @@
+{
+  "name": "@paulober/pyboard-serial-com",
+  "version": "0.1.0",
+  "description": "A simple library to communicate with the pyboard.py tool over serialport.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/paulober/pyboard-serial-com.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "scripts": {
+    "compile": "tsc --project .",
+    "copy-scripts": "node ./scripts/copy-scripts.js",
+    "compile-and-copy": "npm run compile && npm run copy-scripts",
+    "test": "npm run compile-and-copy && node ./dist/tests/index.js"
+  },
+  "author": "paulober",
+  "license": "Apache-2.0",
+  "minimumNodeVersion": 16,
+  "devDependencies": {
+    "@types/node": "^16.14.2",
+    "@typescript-eslint/eslint-plugin": "^5.55.0",
+    "@typescript-eslint/parser": "^5.55.0",
+    "eslint": "^8.36.0",
+    "fs-extra": "^11.1.0",
+    "typescript": "^5.0.2"
+  }
+}

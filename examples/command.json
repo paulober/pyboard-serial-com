@@ -1,0 +1,6 @@
+{
+    "command": "command",
+    "args": {
+        "command": "print('hello world')"
+    }
+}

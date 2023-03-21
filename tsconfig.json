@@ -1,0 +1,39 @@
+{
+	"compilerOptions": {
+		"module": "commonjs",
+		"target": "ES2022",
+		"lib": [
+			"ES2022"
+		],
+		"sourceMap": true,
+		"declaration": true,
+		"allowJs": false,
+		"rootDir": "src",
+		"outDir": "dist",
+		"strict": true,   /* enable all strict type-checking options */
+		/* Import aliases */
+		// baseUrl for relative imports does not work
+		//"baseUrl": "src",
+		/*"paths": {
+			"@pscLib/*": [
+				"*"
+			]
+		},*/
+
+		/* Additional Checks */
+		"noImplicitReturns": true, /* Report error when not all code paths in function return a value. */
+		"noFallthroughCasesInSwitch": true, /* Report errors for fallthrough cases in switch statement. */
+		// "noUnusedParameters": true,  /* Report errors on unused parameters. */
+		"forceConsistentCasingInFileNames": true,
+		// not set and maybe cause porblems with the esModuleInterop set to true in parent projects tsconfig
+		// "esModuleInterop": true
+	},
+	"exclude": [
+		"node_modules",
+		"./out",
+		"./dist"
+	],
+	"include": [
+		"src/**/*.ts"
+	]
+}
