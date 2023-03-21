@@ -11,11 +11,15 @@
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
   },
+  "files": [
+    "src/scripts"
+  ],
   "scripts": {
-    "compile": "tsc --project .",
+    "compile": "webpack --mode production",
+    "compile-tests": "tsc --project tsconfig.tests.json",
     "copy-scripts": "node ./scripts/copy-scripts.js",
-    "compile-and-copy": "npm run compile && npm run copy-scripts",
-    "test": "npm run compile-and-copy && node ./dist/tests/index.js"
+    "compile-tests-and-copy": "npm run compile-tests && npm run copy-scripts",
+    "test": "npm run compile-tests-and-copy && node ./dist/tests/index.js"
   },
   "author": "paulober",
   "license": "Apache-2.0",
@@ -26,6 +30,9 @@
     "@typescript-eslint/parser": "^5.55.0",
     "eslint": "^8.36.0",
     "fs-extra": "^11.1.0",
-    "typescript": "^5.0.2"
+    "ts-loader": "^9.4.2",
+    "typescript": "^5.0.2",
+    "webpack": "^5.76.2",
+    "webpack-cli": "^5.0.1"
   }
 }

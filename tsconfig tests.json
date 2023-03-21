@@ -10,17 +10,7 @@
 		"allowJs": false,
 		"rootDir": "src",
 		"outDir": "dist",
-		"strict": true,   /* enable all strict type-checking options */
-		/* Import aliases */
-		// baseUrl for relative imports does not work
-		//"baseUrl": "src",
-		/*"paths": {
-			"@pscLib/*": [
-				"*"
-			]
-		},*/
-
-		/* Additional Checks */
+		"strict": true,
 		"noImplicitReturns": true,
 		"noFallthroughCasesInSwitch": true,
 		"forceConsistentCasingInFileNames": true,
@@ -29,8 +19,7 @@
 	"exclude": [
 		"node_modules",
 		"./out",
-		"./dist",
-		"src/tests"
+		"./dist"
 	],
 	"include": [
 		"src/**/*.ts"

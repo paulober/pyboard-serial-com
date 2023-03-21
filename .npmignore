@@ -1,0 +1,6 @@
+.github/
+.eslintrc.json
+.prettierrc.json
+webpack.config.js
+tsconfig.json
+tsconfig.tests.json
