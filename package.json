@@ -12,14 +12,14 @@
     "registry": "https://npm.pkg.github.com"
   },
   "files": [
-    "src/scripts"
+    "scripts/**.py",
+    "dist/*.js",
+    "dist/*.d.ts"
   ],
   "scripts": {
     "compile": "webpack --mode production",
     "compile-tests": "tsc --project tsconfig.tests.json",
-    "copy-scripts": "node ./scripts/copy-scripts.js",
-    "compile-tests-and-copy": "npm run compile-tests && npm run copy-scripts",
-    "test": "npm run compile-tests-and-copy && node ./dist/tests/index.js"
+    "test": "npm run compile-tests && node ./dist/tests/index.js"
   },
   "author": "paulober",
   "license": "Apache-2.0",

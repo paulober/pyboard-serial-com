@@ -1,4 +1,4 @@
-import PyboardRunner, { SCAN_DEVICE } from "../pyboardRunner"
+import { PyboardRunner, SCAN_DEVICE } from "../pyboardRunner"
 import { PyOutType } from "../pyout"
 import type {
   PyOut,
@@ -27,7 +27,7 @@ const pyboardRunner = new PyboardRunner(
       )
     } else if (data.type === PyOutType.portsScan) {
       // print all ports
-      console.debug("\n\nPorts found:")
+      console.debug("\nPorts found:")
 
       ;(data as PyOutPortsScan).ports.forEach((port: string) => {
         console.debug(`Port: ${port}`)
@@ -101,7 +101,7 @@ process.on("SIGINT", () => {
 })
 
 ;(async function () {
-    let i = 20
+    let i = 10
     while (i > 0) {
         await new Promise((resolve) => setTimeout(resolve, 1000))
         i--
@@ -109,8 +109,7 @@ process.on("SIGINT", () => {
     pyboardRunner.switchDevice("COM3")
     setTimeout(() => {
         pyboardRunner.listContents("/")
-    }
-    , 700)
+    }, 700)
 })()
 
 ;(async function () {

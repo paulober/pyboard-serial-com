@@ -54,7 +54,7 @@ type PyOperation = {
   ) => void
 }
 
-export default class PyboardRunner {
+export class PyboardRunner {
   public proc: ChildProcessWithoutNullStreams
   private pipeConnected: boolean = false
   private outBuffer: Buffer
@@ -66,6 +66,7 @@ export default class PyboardRunner {
   private device: string
   private readonly wrapperPyPath: string = path.join(
     __dirname,
+    "..",
     "scripts",
     "wrapper.py"
   )
@@ -125,7 +126,7 @@ export default class PyboardRunner {
       {
         stdio: "pipe",
         windowsHide: true,
-        cwd: path.join(__dirname, "scripts"),
+        cwd: path.join(__dirname, "..", "scripts"),
       }
     )
 
@@ -161,7 +162,7 @@ export default class PyboardRunner {
       {
         stdio: "pipe",
         windowsHide: true,
-        cwd: path.join(__dirname, "scripts"),
+        cwd: path.join(__dirname, "..", "scripts"),
       }
     )
 

@@ -4,7 +4,7 @@ const { copySync } = require("fs-extra");
 
 try {
     copySync(
-        "./src/scripts", 
+        "./scripts", 
         "./dist/scripts", 
         {
             overwrite: true,

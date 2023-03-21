@@ -4,3 +4,6 @@
 webpack.config.js
 tsconfig.json
 tsconfig.tests.json
+scripts/.vscode
+scripts/__pycache__
+dist/
