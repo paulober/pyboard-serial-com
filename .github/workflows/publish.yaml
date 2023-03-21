@@ -20,7 +20,7 @@ jobs:
           # Defaults to the user or organization that owns the workflow file
           scope: '@paulober'
       - run: npm ci
-      - run: npm run compile-and-copy
+      - run: npm run compile
       - run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
