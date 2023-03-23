@@ -8,6 +8,8 @@
     "type": "git",
     "url": "https://github.com/paulober/pyboard-serial-com.git"
   },
+  "author": "paulober",
+  "license": "Apache-2.0",
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
   },
@@ -16,14 +18,12 @@
     "dist/*.js",
     "dist/*.d.ts"
   ],
+  "minimumNodeVersion": 16,
   "scripts": {
     "compile": "webpack --mode production",
     "compile-tests": "tsc --project tsconfig.tests.json",
     "test": "npm run compile-tests && node ./dist/tests/index.js"
   },
-  "author": "paulober",
-  "license": "Apache-2.0",
-  "minimumNodeVersion": 16,
   "devDependencies": {
     "@types/node": "^16.14.2",
     "@typescript-eslint/eslint-plugin": "^5.55.0",

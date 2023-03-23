@@ -717,7 +717,7 @@ def filesystem_command(pyb, args, progress_callback=None, verbose=False):
         if dest is None or dest == "":
             dest = src
         elif dest == ".":
-            dest = "/".join(".", src)
+            dest = "./" + src
         elif dest.endswith("/"):
             dest += src
         return dest
@@ -783,9 +783,11 @@ def filesystem_command(pyb, args, progress_callback=None, verbose=False):
         # pyb.exit_raw_repl()
         # pyb.close()
         # sys.exit(1)
-
-        # let the error be handled by the wrapper.py caller
-        print("!!ERR!!")
+        msg = str(er)
+        
+        # let the error be handled by the wrapper.py caller 
+        # + 2 to remove space and ]
+        print("!!ERR!! - " + msg[msg.index("]")+2:], flush=True)
         ########################
         ###### !END EDIT! ######
         ########################

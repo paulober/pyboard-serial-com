@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import pyboard as pyboard
+import mpyFunctions
 
 EOO = "!!EOO!!"  # End of operation
 SUPPORTED_USB_PIDS: list[int] = [
@@ -63,6 +64,12 @@ def find_pico_ports():
     """
     # TODO: maybe return more like the name or description of the device
     return [port.device for port in list_ports.comports() if port.pid in SUPPORTED_USB_PIDS and port.vid == 0x2E8A]
+
+
+def get_directories_to_create(file_paths):
+    for file_path in file_paths:
+        dir = os.path.dirname(file_path)
+        yield (file_path, dir)
 ##################################
 ########## END Utils #############
 ##################################
@@ -95,8 +102,8 @@ class Wrapper:
             target = ":" + target
         pyboard.filesystem_command(self.pyb, ["ls", target])
 
-    def upload_files(self, local: list[str], remote: str = None):
-        """Uploads (a) file(s) to the pyboard.
+    def upload_files(self, local: list[str], remote: str = None, local_base_dir: str = None):
+        """Uploads (a) file(s) to the pico.
 
         Args:
             local (str): The local path to the file(s) to upload splited by a single space.
@@ -104,10 +111,38 @@ class Wrapper:
         """
         if remote == None or remote == "":
             remote = ":"
-        pyboard.filesystem_command(self.pyb, ["cp"]+local+[remote])
+
+        """
+        Copy multiple files per directory:
+        files_by_dir = defaultdict(list)
+        for file_path in file_paths:
+            dir_path = os.path.dirname(file_path)
+            files_by_dir[dir_path].append(file_path)
+
+        for dir_path, files in files_by_dir.items():
+            if not os.path.exists(dir_path):
+                os.makedirs(dir_path)
+            custom_copy(files, dir_path)
+        """
+
+        if local_base_dir != None:
+            # copy one by one; all files must be in a child directory of local_base_dir!!
+            # results in a list of tuples (local full path, relative to base dir path)
+            destinations: list[tuple[str, str]] = list(map(lambda x: (x, x.replace(
+                local_base_dir, "/").replace('\\', '/').replace("///", "/").replace("//", "/")), local.copy()))
+            destinations.sort(key=lambda x: x[1].count('/'))
+            for dest in destinations:
+                dir_path = os.path.dirname(dest[1])
+                self.mkdirs([dir_path])
+                # remate + dir_path and not remote+dest[1] because pyboard would even if only one file is uploaded
+                # treat remote as directory and not as a target file name if it ends with a slash
+                # remote + dir_path because dir_path is relative to the remote path
+                pyboard.filesystem_command(self.pyb, ["cp", dest[0], remote+dir_path+"/"])
+        else:
+            pyboard.filesystem_command(self.pyb, ["cp"]+local+[remote])
 
     def download_files(self, remote: list[str], local: str):
-        """Downloads (a) files from the pyboard.
+        """Downloads (a) files from the pico.
 
         Args:
             remote (str): The remote path to the file(s) to download splited by single space.
@@ -116,7 +151,7 @@ class Wrapper:
         pyboard.filesystem_command(self.pyb, ["cp"]+remote+[local])
 
     def delete_files(self, files: list[str]):
-        """Deletes (a) file(s) on the pyboard.
+        """Deletes (a) file(s) on the pico.
 
         Args:
             files (list[str]): The remote path(s) to the file(s) to delete
@@ -126,7 +161,7 @@ class Wrapper:
             pyboard.filesystem_command(self.pyb, ["rm", file])
 
     def mkdirs(self, folders: list[str]):
-        """Creates (a) folder(s) on the pyboard.
+        """Creates (a) folder(s) on the pico.
 
         Args:
             folders (list[str]): The path to the folder(s) to create on the remote host.
@@ -136,7 +171,7 @@ class Wrapper:
             pyboard.filesystem_command(self.pyb, ["mkdir", folder])
 
     def rmdirs(self, folders: list[str]):
-        """Removes (a) folder(s) on the pyboard.
+        """Removes (a) folder(s) on the pico.
 
         Args:
             folders (list[str]): The path to the folder(s) to remove on the remote host.
@@ -152,6 +187,59 @@ class Wrapper:
             folder (str): The path to the folder to remove on the remote host.
         """
         pyboard.filesystem_command(self.pyb, ["rmdir_recursive", folder])
+
+    def calc_file_hashes(self, files: list[str]):
+        """Calculates the hashes of (a) file(s) on the pico.
+
+        Args:
+            files (list[str]): The path to the file(s) to calculate the hash of.
+        """
+        hashes_script = """\
+import uhashlib
+import ubinascii
+import uos
+
+def hash_file(file):
+    try:
+        if uos.stat(file)[6] > 200 * 1024:
+            print(f'{{"file": "{file}", "error": "File too large"}}')
+            return
+        with open(file, 'rb') as f:
+            h = uhashlib.sha256()
+            while True:
+                data = f.read(1024)
+                if not data:
+                    break
+                h.update(data)
+            print(f'{{"file": "{file}", "hash": "{ubinascii.hexlify(h.digest()).decode()}"}}')
+    except Exception as e:
+        print(f'{{"file": "{file}", "error": "{e.__class__.__name__}: {e}"}}')
+"""
+        # load function in ram on the pyboard
+        self.exec_cmd(hashes_script, False)
+        # call function for each file
+        for file in files:
+            self.exec_cmd(f"hash_file('{file}')")
+
+    def rename_item(self, old: str, new: str):
+        """Renames a file / folder on the pico.
+
+        Args:
+            items (list[str]): The path to the file(s) to rename on the remote host.
+        """
+        self.exec_cmd(mpyFunctions.FC_RENAME_ITEM)
+        self.exec_cmd(f"rename_file('{old}', '{new}')")
+        self.exec_cmd("del rename_file")
+
+    def get_item_stat(self, item: str):
+        """Gets the stat of (a) file(s) on the pico.
+
+        Args:
+            items (list[str]): The path to the file(s) to get the stat of.
+        """
+        self.exec_cmd(mpyFunctions.FC_GET_FILE_INFO)
+        self.exec_cmd(f"get_file_info('{item}')")
+        self.exec_cmd("del get_file_info")
 
     def exec_cmd(self, cmd: str, follow: bool = None):
         """Executes a command on the pyboard.
@@ -206,7 +294,7 @@ if __name__ == "__main__":
             ports = find_pico_ports()
             for port in ports:
                 print(port, flush=True)
-            
+
             # mark scan as EOO
             print(EOO, flush=True)
             # exit the script after printing the ports to stdout
@@ -277,11 +365,10 @@ if __name__ == "__main__":
             #################################
             elif line["command"] == "upload_files" and "files" in line["args"] \
                     and "remote" in line["args"]:
-                if len(line["args"]["files"]) == 1:
-                    wrapper.upload_files([line["args"]["files"][0]],
-                                         sanitize_remote(line["args"]["remote"]))
+                if "local_base_dir" in line["args"]:
+                    wrapper.upload_files(line["args"]["files"], sanitize_remote(
+                        line["args"]["remote"]), line["args"]["local_base_dir"])
                 else:
-                    # if more files in the list, the remote path is the folder to save the files to and join the files with spaces
                     wrapper.upload_files(line["args"]["files"],
                                          sanitize_remote(line["args"]["remote"]))
 
@@ -314,6 +401,19 @@ if __name__ == "__main__":
             ##############################################
             elif line["command"] == "rmtree" and "folders" in line["args"]:
                 wrapper.rmdir_recursive(line["args"]["folders"][0])
+
+            ##############################################
+            ######## Get file hashes with pyboard ########
+            ##############################################
+            elif line["command"] == "calc_file_hashes" and "files" in line["args"]:
+                wrapper.calc_file_hashes(line["args"]["files"])
+
+            elif line["command"] == "rename" and "item" in line["args"] and "new_name" in line["args"]["item"] and "old_name" in line["args"]["item"]:
+                wrapper.rename_item(line["args"]["item"]["old_name"],
+                                    line["args"]["item"]["new_name"])
+
+            elif line["command"] == "get_item_stat" and "item" in line["args"]:
+                wrapper.get_item_stat(line["args"]["item"])
 
             else:
                 print("!!Unknown command!!", flush=True)

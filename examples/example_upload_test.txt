@@ -1,0 +1,7 @@
+{ "command": "upload_files", "args": { "files": ["N:\\pyboard-serial-com\\scripts\\test\\example.py", "N:\\pyboard-serial-com\\scripts\\test\\test123\\test.py"], "remote": ":", "local_base_dir": "N:\\pyboard-serial-com\\scripts\\test\\" } }
+
+{ "command": "list_contents", "args": { "target": "/" } }
+{ "command": "list_contents", "args": { "target": "/test123" } }
+{ "command": "rmtree", "args": { "folders": ["/test123"] } }
+{ "command": "delete_files", "args": { "files": ["test.py", "example.py"] } }
+{ "command": "exit", "args": { } }

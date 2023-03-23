@@ -28,7 +28,6 @@ const pyboardRunner = new PyboardRunner(
     } else if (data.type === PyOutType.portsScan) {
       // print all ports
       console.debug("\nPorts found:")
-
       ;(data as PyOutPortsScan).ports.forEach((port: string) => {
         console.debug(`Port: ${port}`)
       })
@@ -38,11 +37,10 @@ const pyboardRunner = new PyboardRunner(
   },
   (data: Buffer | undefined) => {
     if (data !== undefined) {
-        console.log(`stderr: ${data?.toString()}`)
-    }
-    else {
-        // connected sucessfully
-        console.log("Connected!")
+      console.log(`stderr: ${data?.toString()}`)
+    } else {
+      // connected sucessfully
+      console.log("Connected!")
     }
   },
   (code: number, signal: string) => {
@@ -99,19 +97,22 @@ process.on("SIGINT", () => {
   pyboardRunner.disconnect()
   process.exit()
 })
-
 ;(async function () {
-    let i = 10
-    while (i > 0) {
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-        i--
-    }
-    pyboardRunner.switchDevice("COM3")
-    setTimeout(() => {
-        pyboardRunner.listContents("/")
-    }, 700)
+  let i = 10
+  while (i > 0) {
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    i--
+  }
+  pyboardRunner.switchDevice("COM3")
+  setTimeout(() => {
+    pyboardRunner.listContents("/")
+    pyboardRunner.startUploadingProject(
+      "N:\\pyboard-serial-com\\scripts\\test",
+      [".py"],
+      []
+    )
+  }, 700)
 })()
-
 ;(async function () {
   while (true) {
     await new Promise((resolve) => setTimeout(resolve, 1000))

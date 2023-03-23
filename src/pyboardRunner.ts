@@ -4,6 +4,8 @@ import path = require("path")
 import { PyOutType } from "./pyout"
 import type { PyOut, PyOutCommand, PyOutPortsScan } from "./pyout"
 import type PyFileData from "./pyfileData"
+import type { ScanOptions } from "./generateFileHashes"
+import { scanFolder } from "./generateFileHashes"
 
 const EOO: string = "!!EOO!!"
 // This string is also hardcoded into pyboard.py at various places
@@ -24,6 +26,7 @@ enum OperationType {
   createFolders,
   deleteFolders,
   deleteFolderRecursive,
+  calcHashes,
 }
 
 type Command = {
@@ -36,6 +39,7 @@ type Command = {
     | "mkdirs"
     | "rmdirs"
     | "rmtree"
+    | "calc_file_hashes"
     | "exit"
   args: {
     command?: string
@@ -45,6 +49,8 @@ type Command = {
     target?: string
     local?: string
     remote?: string
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    local_base_dir?: string
   }
 }
 
@@ -52,6 +58,17 @@ type PyOperation = {
   callback: (
     runCommand: (command: Command, operationType: OperationType) => boolean
   ) => void
+}
+
+function getDirectoriesToCreate(filePaths: string[]): string[] {
+  const directories = new Set<string>()
+
+  for (const filePath of filePaths) {
+    const dir = path.dirname(filePath)
+    directories.add(dir)
+  }
+
+  return Array.from(directories)
 }
 
 export class PyboardRunner {
@@ -76,6 +93,11 @@ export class PyboardRunner {
   private out: (data: PyOut) => Promise<void>
   private err: (data: Buffer | undefined) => void
   private exit: (code: number, signal: string) => void
+
+  // cache
+  private localFileHashes: Map<string, string> = new Map()
+  private projectRoot: string = ""
+  private remoteFileHashes: Map<string, string> = new Map()
 
   /**
    * Auto-connects to the serial port provided.
@@ -197,7 +219,7 @@ export class PyboardRunner {
     if (!this.proc.killed) {
       this.proc.kill()
     }
-    
+
     this.device = device
 
     // reset operation queue state
@@ -217,7 +239,7 @@ export class PyboardRunner {
     )
     // DEBUG: for single step debugging to see outBuffer content
     // in a readable format
-    //const f = this.outBuffer.toString('utf-8')
+    //const f = this.outBuffer.toString("utf-8")
 
     if (data.includes("\n")) {
       //console.debug(`stdout: ${this.outBuffer.toString('utf-8')}`)
@@ -326,7 +348,9 @@ export class PyboardRunner {
             this.out({
               type: PyOutType.fsOps,
               // return false if operation experienced an error
-              status: !this.outBuffer.includes(ERR),
+              status: this.outBuffer.includes(ERR)
+                ? this.outBuffer.includes("EXIST")
+                : true,
             } as PyOut)
 
             // jump to buffer deletion as operation is now finished
@@ -334,6 +358,67 @@ export class PyboardRunner {
           }
 
           // avoid deletion of buffer
+          return
+
+        case OperationType.calcHashes:
+          if (data.includes(EOO)) {
+            // stop operation
+            this.operationOngoing = OperationType.none
+
+            this.remoteFileHashes.clear()
+            // for each line in outBuffer
+            for (const line of this.outBuffer
+              // -2 for trailing \r or \n
+              // (not needed because of hashes.length check)
+              .slice(0, -EOO.length - 2)
+              .toString("utf-8")
+              .split("\n")) {
+
+              if (line.length < 4) {
+                continue
+              }
+
+              const result = JSON.parse(line.trim().replaceAll("\r", ""))
+
+              if (!("error" in result)) {
+                this.remoteFileHashes.set(result.file, result.hash)
+              } else {
+                console.debug(
+                  "File not found or other error, like to big to calc hash for"
+                )
+              }
+            }
+            let queue: PyOperation[] | undefined
+            // if queue is not empty save all items in var, run this.uploadProject and readd them
+            if (this.operationQueue.length > 0) {
+              queue = this.operationQueue
+              this.operationQueue = []
+            }
+            this.uploadProject()
+            if (queue !== undefined) {
+              if (this.operationQueue.length === 0) {
+                this.operationQueue = queue
+                break
+              }
+
+              // add all items from queue to operationQueue
+              // add operationQueue item to end of queue and the operationQueue = queue
+              // but this maybe drop other operations added to queue while running uploadProject
+
+              queue.push(this.operationQueue.pop()!)
+
+              if (this.operationQueue.length !== 0) {
+                for (const item of this.operationQueue) {
+                  queue.push(item)
+                }
+              }
+
+              this.operationQueue = queue
+            }
+
+            break
+          }
+
           return
 
         default:
@@ -388,6 +473,7 @@ export class PyboardRunner {
 
     // start operation
     let errOccured = false
+    //let cmd = JSON.stringify(command) // .replaceAll("\\\\", "\\")
     this.proc.stdin.write(JSON.stringify(command) + "\n", (err) => {
       errOccured = err instanceof Error
     })
@@ -477,25 +563,35 @@ export class PyboardRunner {
    * @param files The files to upload. If count is 1, the local or remote path
    * CAN be used as target file or folder
    * @param target The target folder. If files count is 1, this can be used as target
+   * else it will be used as target folder where ALL files will be uploaded to
+   * @param localBaseDir If set the local path will be stripped from the file and the
+   * remaining path will be appended to the target path for each file
    * @returns If the operation was successfully started
    */
-  public uploadFiles(files: string[], target: string): void {
+  public uploadFiles(
+    files: string[],
+    target: string,
+    localBaseDir?: string
+  ): void {
     if (!this.pipeConnected) {
       return
     }
 
+    const command: Command = {
+      command: "upload_files",
+      args: {
+        files: files,
+        remote: target,
+      },
+    }
+
+    if (localBaseDir) {
+      command.args.local_base_dir = localBaseDir
+    }
+
     this.addOperation({
       callback: (runCommand) => {
-        runCommand(
-          {
-            command: "upload_files",
-            args: {
-              files: files,
-              remote: target,
-            },
-          },
-          OperationType.uploadFiles
-        )
+        runCommand(command, OperationType.uploadFiles)
       },
     })
   }
@@ -633,6 +729,79 @@ export class PyboardRunner {
         )
       },
     })
+  }
+
+  /**
+   * Starts the upload process of a project folder
+   * After this operation it will not trigger the 'out' callback
+   * instead it will transition to the 'uploading' state and then emit and fsOps
+   * complete callback
+   *
+   * TODO: the resulting fsOps complete could be confused with an operation added to queue
+   * after this one and before upload operations has been triggered by the projectUpload
+   *
+   * @param projectFolder Root folder of the project to upload
+   * @param fileTypes File types to upload. Empty array for all
+   * @param ignoredItems Items to ignore
+   */
+  public startUploadingProject(
+    projectFolder: string,
+    fileTypes: string[],
+    ignoredItems: string[]
+  ): void {
+    /*const localHashes = await generateFileHashes(
+      projectFolder,
+      fileTypes,
+      ignoredItems
+    )*/
+    const localHashes = scanFolder({
+      folderPath: projectFolder,
+      fileTypes,
+      ignoredItems,
+    } as ScanOptions)
+
+    // add localHashes to this.localFileHashes
+    this.localFileHashes = localHashes
+    this.projectRoot = projectFolder
+
+    this.addOperation({
+      callback: (runCommand) => {
+        runCommand(
+          {
+            command: "calc_file_hashes",
+            args: {
+              files: Array.from(localHashes.keys(), (file) =>
+                // clear out any Windows style and duble slashes
+                file.replace("\\", "/").replace("//", "/")
+              ),
+            },
+          },
+          OperationType.calcHashes
+        )
+      },
+    })
+  }
+
+  private uploadProject(): void {
+    const filesToUpload = [...this.localFileHashes.keys()]
+      .filter(
+        (file) =>
+          !this.remoteFileHashes.has(file) ||
+          this.remoteFileHashes.get(file) !== this.localFileHashes.get(file)
+      )
+      .map((file) => path.join(this.projectRoot, file), this)
+
+    if (filesToUpload.length > 0) {
+      this.uploadFiles(filesToUpload, ":", this.projectRoot)
+    }
+  }
+
+  /**
+   * Downloads all files from the remote host to the project root
+   */
+  // TODO!!!!!!! the cp upload of pyboard.py does not keep the folders it puts all files in root
+  public downloadProject(projectRoot: string): void {
+    //this.downloadFiles(":", this.projectRoot)
   }
 
   /**
