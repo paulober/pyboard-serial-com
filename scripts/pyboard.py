@@ -844,6 +844,11 @@ def main():
         "-p", "--password", default="python", help="the telnet login password")
     cmd_parser.add_argument(
         "-c", "--command", help="program passed in as string")
+    # EDITED by paulober
+    cmd_parser.add_argument(
+        '-x', '--execute', help='evaluate the given Python code and print the result if it is an expression'
+    )
+    # END EDIT
     cmd_parser.add_argument(
         "-w",
         "--wait",
@@ -905,6 +910,27 @@ def main():
     except PyboardError as er:
         print(er)
         sys.exit(1)
+
+    # EDITED by paulober
+    if args.execute is not None:
+        pyb.enter_raw_repl(False)
+
+        try:
+            code_ast = ast.parse(args.execute, mode='eval')
+            wrapped_code = 'print({})'.format(args.execute)
+        except SyntaxError:
+            wrapped_code = args.execute
+
+        try:
+            out, err = pyb.exec_raw(wrapped_code, data_consumer=stdout_write_bytes)
+            print("ERR: " + str(err) + "\n\n" + "wrapped_code: " + str(wrapped_code))
+        except PyboardError as er:
+            print(er)            
+        print()  # print a final newline
+        pyb.exit_raw_repl()
+        pyb.close()
+        sys.exit(1)
+    # END EDIT
 
     # run any command or file(s)
     if args.command is not None or args.filesystem or len(args.files):

@@ -3,38 +3,14 @@ import { PyOutType } from "../pyout"
 import type {
   PyOut,
   PyOutListContents,
-  PyOutCommand,
+  PyOutCommandResult,
+  PyOutCommandWithResponse,
   PyOutFsOps,
   PyOutPortsScan,
 } from "../pyout"
 
 const pyboardRunner = new PyboardRunner(
   SCAN_DEVICE,
-  async (data: PyOut) => {
-    if (data.type === PyOutType.listContents) {
-      const contents = data as PyOutListContents
-
-      //console.log(contents.response)
-      contents.response.forEach((file) => {
-        console.log(`File: ${file.path} (${file.size} bytes)`)
-      })
-    } else if (data.type === PyOutType.command) {
-      console.log(`Command response: ${(data as PyOutCommand).response}`)
-    } else if (data.type === PyOutType.fsOps) {
-      console.log(
-        "Filesystem operation status: " +
-          ((data as PyOutFsOps).status ? "Done" : "Failure")
-      )
-    } else if (data.type === PyOutType.portsScan) {
-      // print all ports
-      console.debug("\nPorts found:")
-      ;(data as PyOutPortsScan).ports.forEach((port: string) => {
-        console.debug(`Port: ${port}`)
-      })
-    } else {
-      console.log(`stdout: ${data}`)
-    }
-  },
   (data: Buffer | undefined) => {
     if (data !== undefined) {
       console.log(`stderr: ${data?.toString()}`)
@@ -58,7 +34,7 @@ const pyboardRunner = new PyboardRunner(
 //console.log(`Waiting for process to start: ${pyboardRunner.isConnected()}`)
 //pyboardRunner.stop()
 //while (pyboardRunner.proc.connected) {}
-setTimeout(() => {
+setTimeout(async () => {
   //console.log(pyboardRunner.executeCommand("print('Hello World')"))
   //console.log(pyboardRunner.listContents("/"))
   /*console.log(
@@ -72,11 +48,10 @@ setTimeout(() => {
 
   //pyboardRunner.deleteFiles(["tesf.txt", "anders.py"])
 
-  /*pyboardRunner.listContents("/")
-    pyboardRunner.createFolders(["test", "test2"])
-    pyboardRunner.listContents("/")
-    pyboardRunner.deleteFolders(["test", "test2"])
-    pyboardRunner.listContents("/")*/
+  //pyboardRunner.createFolders(["test", "test2"])
+  //pyboardRunner.listContents("/")
+  //pyboardRunner.deleteFolders(["test", "test2"])
+  //pyboardRunner.listContents("/")
 
   /* Works!!
     pyboardRunner.createFolders(["test"])
@@ -92,6 +67,29 @@ setTimeout(() => {
   console.log("===== Finished adding all operations!")
 }, 700)
 
+async function listDataCp(data: PyOut): Promise<void> {
+  if (data.type === PyOutType.listContents) {
+    const contents = data as PyOutListContents
+    contents.response.forEach((file) => {
+      console.log(
+        `${file.isDir ? "Directory" : "File"}: ${file.path} (${
+          file.size
+        } bytes)`
+      )
+    })
+  }
+}
+
+async function friendlyCommandCb(data: string): Promise<void> {
+  // vscode debugging console doesn't show stdout, so we need to use console.log
+  if (process.env.v8debug !== undefined) {
+    console.log(data)
+  }
+  else {
+    process.stdout.write(data)
+  }
+}
+
 process.on("SIGINT", () => {
   console.log("Caught interrupt signal")
   pyboardRunner.disconnect()
@@ -105,12 +103,58 @@ process.on("SIGINT", () => {
   }
   pyboardRunner.switchDevice("COM3")
   setTimeout(() => {
-    pyboardRunner.listContents("/")
-    pyboardRunner.startUploadingProject(
+    pyboardRunner.listContents("/").then(listDataCp)
+    pyboardRunner.createFolders(["test9", "atest9"]).then((data: PyOut) => {
+      if (data.type === PyOutType.fsOps) {
+        const result = data as PyOutFsOps
+        console.log(`Create folder status: ${result.status}`)
+      }
+    })
+    pyboardRunner.listContents("/").then(listDataCp)
+    pyboardRunner.deleteFolders(["test9", "atest9"]).then((data: PyOut) => {
+      if (data.type === PyOutType.fsOps) {
+        const result = data as PyOutFsOps
+        console.log(`Delete folder status: ${result.status}`)
+      }
+    })
+    pyboardRunner.listContents("/").then(listDataCp)
+    /*pyboardRunner.startUploadingProject(
       "N:\\pyboard-serial-com\\scripts\\test",
       [".py"],
       []
-    )
+    )*/
+    pyboardRunner
+      .executeFriendlyCommand("print('Hello World')", friendlyCommandCb)
+      .then((data: PyOut) => {
+        if (data.type === PyOutType.commandResult) {
+          const result = data as PyOutCommandResult
+          console.log(`Friendly Command result: ${result.result}`)
+        }
+      })
+    pyboardRunner
+      .executeFriendlyCommand("a=2", friendlyCommandCb)
+      .then((data: PyOut) => {
+        if (data.type === PyOutType.commandResult) {
+          const result = data as PyOutCommandResult
+          console.log(`Friendly Command result: ${result.result}`)
+        }
+      })
+    pyboardRunner
+      .executeFriendlyCommand("a", friendlyCommandCb)
+      .then((data: PyOut) => {
+        if (data.type === PyOutType.commandResult) {
+          const result = data as PyOutCommandResult
+          console.log(`Friendly Command result: ${result.result}`)
+        }
+      })
+    pyboardRunner
+      .executeFriendlyCommand("while a < 50: print(a); a+=1", friendlyCommandCb)
+      .then((data: PyOut) => {
+        if (data.type === PyOutType.commandResult) {
+          const result = data as PyOutCommandResult
+          console.log(`Friendly Command result: ${result.result}`)
+        }
+      })
   }, 700)
 })()
 ;(async function () {

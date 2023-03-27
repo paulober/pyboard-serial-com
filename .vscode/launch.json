@@ -15,7 +15,10 @@
             "preLaunchTask": "npm: compile-tests",
             "outFiles": [
                 "${workspaceFolder}/dist/**/*.js"
-            ]
+            ],
+            "env": {
+                "v8debug": "true"
+            }
         }
     ]
 }

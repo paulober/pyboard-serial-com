@@ -1,11 +1,17 @@
 import type { ChildProcessWithoutNullStreams } from "child_process"
 import { spawn } from "child_process"
 import path = require("path")
+import type {
+  PyOut,
+  PyOutCommandResult,
+  PyOutCommandWithResponse,
+  PyOutPortsScan,
+} from "./pyout"
 import { PyOutType } from "./pyout"
-import type { PyOut, PyOutCommand, PyOutPortsScan } from "./pyout"
 import type PyFileData from "./pyfileData"
 import type { ScanOptions } from "./generateFileHashes"
 import { scanFolder } from "./generateFileHashes"
+import { EventEmitter } from "events"
 
 const EOO: string = "!!EOO!!"
 // This string is also hardcoded into pyboard.py at various places
@@ -17,6 +23,7 @@ enum OperationType {
   none,
   scanPorts,
   command,
+  friendlyCommand,
   listContents,
 
   // fsOps
@@ -32,6 +39,8 @@ enum OperationType {
 type Command = {
   command:
     | "command"
+    | "friendly_command"
+    | "double_ctrlc"
     | "list_contents"
     | "upload_files"
     | "download_files"
@@ -54,10 +63,9 @@ type Command = {
   }
 }
 
-type PyOperation = {
-  callback: (
-    runCommand: (command: Command, operationType: OperationType) => boolean
-  ) => void
+enum PyboardRunnerEvents {
+  operationQueueCanceld = "operationQueueCanceld",
+  nextOperation = "nextOperation",
 }
 
 function getDirectoriesToCreate(filePaths: string[]): string[] {
@@ -71,14 +79,16 @@ function getDirectoriesToCreate(filePaths: string[]): string[] {
   return Array.from(directories)
 }
 
-export class PyboardRunner {
+export class PyboardRunner extends EventEmitter {
   public proc: ChildProcessWithoutNullStreams
   private pipeConnected: boolean = false
   private outBuffer: Buffer
   // defines the output to the parent
   private processingOperation: boolean = false
   private operationOngoing: OperationType = OperationType.none
-  private operationQueue: PyOperation[] = []
+  private runningOperation: number = -1
+  private operationQueue: number[] = []
+  private idCounter = 1
 
   private device: string
   private readonly wrapperPyPath: string = path.join(
@@ -90,7 +100,6 @@ export class PyboardRunner {
   private pythonExe: string
 
   // parent
-  private out: (data: PyOut) => Promise<void>
   private err: (data: Buffer | undefined) => void
   private exit: (code: number, signal: string) => void
 
@@ -113,11 +122,13 @@ export class PyboardRunner {
    */
   constructor(
     device: string,
-    out: (data: PyOut) => Promise<void>,
     err: (data: Buffer | undefined) => void,
     exit: (code: number, signal: string) => void,
-    pythonExe: string = "default"
+    pythonExe: string = "default",
+    scanOutput?: ((data: PyOutPortsScan) => void)
   ) {
+    super()
+
     if (pythonExe === "default") {
       pythonExe = process.platform === "win32" ? "python" : "python3"
     }
@@ -125,7 +136,6 @@ export class PyboardRunner {
     this.outBuffer = Buffer.alloc(0)
 
     // callback stuff
-    this.out = out
     this.err = err
     this.exit = exit
 
@@ -135,7 +145,6 @@ export class PyboardRunner {
 
     if (this.device === SCAN_DEVICE) {
       console.debug("Scanning ports")
-      this.operationOngoing = OperationType.scanPorts
     } else {
       console.debug(`Connecting to ${this.device}`)
     }
@@ -152,14 +161,40 @@ export class PyboardRunner {
       }
     )
 
+    if (this.device === SCAN_DEVICE) {
+      this.proc.stdout.on("data", (data: Buffer) => {
+        if (data.includes(EOO)) {
+          // stop operation
+          this.operationOngoing = OperationType.none
+
+          // if data contains more than EOO, then return other stuff before quitting
+          if (this.outBuffer.toString("utf-8").trim() !== EOO) {
+            // remove EOO from data (-4 because \n before and after EOO)
+            this.outBuffer = this.outBuffer.slice(0, -EOO.length - 4)
+          }
+
+          const resp: PyOutPortsScan = {
+            type: PyOutType.portsScan,
+            ports: this.outBuffer.toString("utf-8").split("\n"),
+          }
+
+          this.outBuffer = Buffer.alloc(0)
+
+          scanOutput?.(resp)
+          this.disconnect()
+        }
+
+        // avoid buffer clean-up
+        return
+      })
+    }
+
     this.proc.on("spawn", () => {
       this.pipeConnected = true
       console.debug("Spawned")
 
       this.err(undefined)
     })
-
-    this.proc.stdout.on("data", (data: Buffer) => this.onStdout(data))
 
     this.proc.stderr.on("data", (err: Buffer) => this.onStderr(err))
 
@@ -195,7 +230,7 @@ export class PyboardRunner {
       this.err(undefined)
     })
 
-    this.proc.stdout.on("data", (data: Buffer) => this.onStdout(data))
+    //this.proc.stdout.on("data", (data: Buffer) => this.onStdout(data))
 
     this.proc.stderr.on("data", (err: Buffer) => this.onStderr(err))
 
@@ -224,215 +259,23 @@ export class PyboardRunner {
 
     // reset operation queue state
     if (this.operationQueue.length > 0) {
+      // TODO: this will remove all promissess, maybe infinity lock
+      this.removeAllListeners()
+
       this.operationQueue = []
-      this.operationOngoing = OperationType.none
-      this.processingOperation = false
+
+      // TODO: maybe cancel all primisses by having them all listen to this event
+      //this.emit(PyboardRunnerEvents.operationQueueCanceld, this.operationQueue)
     }
+
+    // reset state
+    this.operationOngoing = OperationType.none
+    this.outBuffer = Buffer.alloc(0)
+    this.idCounter = 1
+    this.runningOperation = -1
+    this.processingOperation = false
 
     this.spawnNewProcess()
-  }
-
-  private onStdout(data: Buffer): void {
-    this.outBuffer = Buffer.concat(
-      [this.outBuffer, data],
-      this.outBuffer.length + data.length
-    )
-    // DEBUG: for single step debugging to see outBuffer content
-    // in a readable format
-    //const f = this.outBuffer.toString("utf-8")
-
-    if (data.includes("\n")) {
-      //console.debug(`stdout: ${this.outBuffer.toString('utf-8')}`)
-      switch (this.operationOngoing) {
-        case OperationType.scanPorts:
-          if (data.includes(EOO)) {
-            // stop operation
-            this.operationOngoing = OperationType.none
-
-            // if data contains more than EOO, then return other stuff before quitting
-            if (this.outBuffer.toString("utf-8").trim() !== EOO) {
-              // remove EOO from data (-4 because \n before and after EOO)
-              this.outBuffer = this.outBuffer.slice(0, -EOO.length - 4)
-            }
-
-            const resp: PyOutPortsScan = {
-              type: PyOutType.portsScan,
-              ports: this.outBuffer.toString("utf-8").split("\n"),
-            }
-            this.out(resp)
-
-            break
-          }
-
-          return
-
-        case OperationType.command:
-          if (data.includes(EOO)) {
-            // stop operation
-            this.operationOngoing = OperationType.none
-
-            // if data contains more than EOO, then return other stuff before quitting
-            if (data.toString("utf-8").trim() !== EOO) {
-              // remove EOO from data (-4 because \n before and after EOO)
-              this.outBuffer = this.outBuffer.slice(0, -EOO.length - 4)
-              const resp: PyOutCommand = {
-                type: PyOutType.command,
-                response: this.outBuffer.toString("utf-8"),
-              }
-              this.out(resp)
-            }
-          }
-
-          const resp: PyOutCommand = {
-            type: PyOutType.command,
-            response: this.outBuffer.toString("utf-8"),
-          }
-          this.out(resp)
-
-          break
-
-        case OperationType.listContents:
-          if (data.includes(EOO)) {
-            // stop operation
-            this.operationOngoing = OperationType.none
-
-            // for each line in outBuffer
-            const files: PyFileData[] = []
-            for (const line of this.outBuffer
-              // -4 for trailing and leading\n
-              // (not needed because of parts.length check)
-              .slice(0, -EOO.length)
-              .toString("utf-8")
-              .split("\n")) {
-              const parts: string[] = line
-                .trimStart()
-                .replaceAll("\r", "")
-                .split(" ")
-
-              // TODO: maybe merge parts with index 2 and up
-              // to support file names with spaces
-              if (parts.length !== 2) {
-                continue
-              }
-
-              const file: PyFileData = {
-                path: parts[1],
-                size: parseInt(parts[0]),
-              }
-              files.push(file)
-            }
-            this.out({
-              type: PyOutType.listContents,
-              response: files,
-            } as PyOut)
-
-            // jump to clear buffer as operation is now finishd
-            break
-          }
-
-          // avoid clearing of buffer as operation is not finished
-          // TODO: maybe check for timeout
-          // return if listContents but not EOO because operation is not done
-          return
-
-        case OperationType.uploadFiles:
-        case OperationType.downloadFiles:
-        case OperationType.deleteFiles:
-        case OperationType.createFolders:
-        case OperationType.deleteFolders:
-        case OperationType.deleteFolderRecursive:
-          if (data.includes(EOO)) {
-            // stop operation
-            this.operationOngoing = OperationType.none
-
-            this.out({
-              type: PyOutType.fsOps,
-              // return false if operation experienced an error
-              status: this.outBuffer.includes(ERR)
-                ? this.outBuffer.includes("EXIST")
-                : true,
-            } as PyOut)
-
-            // jump to buffer deletion as operation is now finished
-            break
-          }
-
-          // avoid deletion of buffer
-          return
-
-        case OperationType.calcHashes:
-          if (data.includes(EOO)) {
-            // stop operation
-            this.operationOngoing = OperationType.none
-
-            this.remoteFileHashes.clear()
-            // for each line in outBuffer
-            for (const line of this.outBuffer
-              // -2 for trailing \r or \n
-              // (not needed because of hashes.length check)
-              .slice(0, -EOO.length - 2)
-              .toString("utf-8")
-              .split("\n")) {
-
-              if (line.length < 4) {
-                continue
-              }
-
-              const result = JSON.parse(line.trim().replaceAll("\r", ""))
-
-              if (!("error" in result)) {
-                this.remoteFileHashes.set(result.file, result.hash)
-              } else {
-                console.debug(
-                  "File not found or other error, like to big to calc hash for"
-                )
-              }
-            }
-            let queue: PyOperation[] | undefined
-            // if queue is not empty save all items in var, run this.uploadProject and readd them
-            if (this.operationQueue.length > 0) {
-              queue = this.operationQueue
-              this.operationQueue = []
-            }
-            this.uploadProject()
-            if (queue !== undefined) {
-              if (this.operationQueue.length === 0) {
-                this.operationQueue = queue
-                break
-              }
-
-              // add all items from queue to operationQueue
-              // add operationQueue item to end of queue and the operationQueue = queue
-              // but this maybe drop other operations added to queue while running uploadProject
-
-              queue.push(this.operationQueue.pop()!)
-
-              if (this.operationQueue.length !== 0) {
-                for (const item of this.operationQueue) {
-                  queue.push(item)
-                }
-              }
-
-              this.operationQueue = queue
-            }
-
-            break
-          }
-
-          return
-
-        default:
-          console.log(`stdout: ${this.outBuffer.toString("utf-8")}`)
-          break
-      }
-
-      // flush outBuffer
-      this.outBuffer = Buffer.alloc(0)
-
-      if (this.operationOngoing === OperationType.none) {
-        this.processNextOperation()
-      }
-    }
   }
 
   private onStderr(data: Buffer): void {
@@ -457,32 +300,272 @@ export class PyboardRunner {
     return this.pipeConnected
   }
 
-  private runCommand(command: Command, operationType: OperationType): boolean {
-    if (
-      !this.pipeConnected ||
-      // operation must not be marked as ongoing before sending the command
-      this.operationOngoing !== OperationType.none
-    ) {
-      return false
+  /**
+   * Executes a {Command} on the target device.
+   *
+   * @param command
+   * @param operationType
+   * @param follow Only respected if operationType is command or friendlyCommand.
+   * Will be called with progress
+   * @returns
+   */
+  private async runCommand(
+    command: Command,
+    operationType: OperationType,
+    follow: ((data: string) => void) | null = null
+  ): Promise<PyOut> {
+    if (!this.pipeConnected) {
+      return { type: PyOutType.none } as PyOut
     }
 
-    // set operation type so that the stdout handler knows what to do
-    this.operationOngoing = operationType
+    return new Promise((resolve) => {
+      const opId = this.idCounter++
 
-    /*this.proc.send(...)*/
+      this.once(`${PyboardRunnerEvents.nextOperation}_${opId}`, async () => {
+        // operation already in progress?
+        if (this.operationOngoing !== OperationType.none) {
+          resolve({ type: PyOutType.none } as PyOut)
 
-    // start operation
-    let errOccured = false
-    //let cmd = JSON.stringify(command) // .replaceAll("\\\\", "\\")
-    this.proc.stdin.write(JSON.stringify(command) + "\n", (err) => {
-      errOccured = err instanceof Error
+          return
+        }
+
+        // set operation type so that the stdout handler knows what to do
+        this.operationOngoing = operationType
+
+        // start operation
+        let errOccured = false
+        //let cmd = JSON.stringify(command) // .replaceAll("\\\\", "\\")
+        this.proc.stdin.write(JSON.stringify(command) + "\n", (err) => {
+          errOccured = err instanceof Error
+        })
+
+        if (errOccured) {
+          // operation failed
+          this.operationOngoing = OperationType.none
+          this.processNextOperation()
+          resolve({ type: PyOutType.none } as PyOut)
+        } else {
+          // listen for operation output
+          this.proc.stdout.addListener("data", (data: Buffer) => {
+            this.outBuffer = Buffer.concat(
+              [this.outBuffer, data],
+              this.outBuffer.length + data.length
+            )
+            // DEBUG: for single step debugging to see outBuffer content
+            // in a readable format
+            //const f = this.outBuffer.toString("utf-8")
+
+            if (data.includes("\n")) {
+              let opResult: PyOut = { type: PyOutType.none } as PyOut
+
+              //console.debug(`stdout: ${this.outBuffer.toString('utf-8')}`)
+              switch (this.operationOngoing) {
+                // moved out
+                //case OperationType.scanPorts:
+
+                case OperationType.command:
+                case OperationType.friendlyCommand:
+                  if (data.includes(EOO)) {
+                    // stop operation - trigger resolve at end of scope
+                    this.operationOngoing = OperationType.none
+
+                    // if data contains more than EOO, then return other stuff before quitting
+                    if (data.toString("utf-8").trim() !== EOO) {
+                      // remove EOO from data (-4 because \n before and after EOO)
+                      this.outBuffer = this.outBuffer.slice(0, -EOO.length - 4)
+
+                      if (follow !== null) {
+                        follow(this.outBuffer.toString("utf-8"))
+                      }
+                    }
+
+                    if (follow !== null) {
+                      opResult = {
+                        type: PyOutType.commandResult,
+                        result: true,
+                      } as PyOutCommandResult
+                    } else {
+                      // return full buffer
+                      opResult = {
+                        type: PyOutType.commandWithResponse,
+                        response: this.outBuffer.toString("utf-8"),
+                      } as PyOutCommandWithResponse
+                    }
+                  } else {
+                    // either keep in buffer or write into cb and clean buffer
+                    if (follow !== null) {
+                      follow(this.outBuffer.toString("utf-8"))
+                    }
+                    // if not follow result has to be kept in buffer so return to avoid clean-up
+                    else {
+                      return
+                    }
+                  }
+
+                  break
+
+                case OperationType.listContents:
+                  if (data.includes(EOO)) {
+                    // stop operation
+                    this.operationOngoing = OperationType.none
+
+                    // for each line in outBuffer
+                    const files: PyFileData[] = []
+                    for (const line of this.outBuffer
+                      // -4 for trailing and leading\n
+                      // (not needed because of parts.length check)
+                      .slice(0, -EOO.length)
+                      .toString("utf-8")
+                      .split("\n")) {
+                      const parts: string[] = line
+                        .trimStart()
+                        .replaceAll("\r", "")
+                        .split(" ")
+
+                      // TODO: maybe merge parts with index 2 and up
+                      // to support file names with spaces
+                      if (parts.length !== 2) {
+                        continue
+                      }
+
+                      const file: PyFileData = {
+                        path: parts[1],
+                        isDir: parts[1].endsWith("/"),
+                        size: parseInt(parts[0]),
+                      }
+                      files.push(file)
+                    }
+
+                    opResult = {
+                      type: PyOutType.listContents,
+                      response: files,
+                    } as PyOut
+
+                    // jump to clear buffer as operation is now finishd
+                    break
+                  }
+
+                  // avoid clearing of buffer as operation is not finished
+                  // TODO: maybe check for timeout
+                  // return if listContents but not EOO because operation is not done
+                  return
+
+                case OperationType.uploadFiles:
+                case OperationType.downloadFiles:
+                case OperationType.deleteFiles:
+                case OperationType.createFolders:
+                case OperationType.deleteFolders:
+                case OperationType.deleteFolderRecursive:
+                  if (data.includes(EOO)) {
+                    // stop operation
+                    this.operationOngoing = OperationType.none
+
+                    opResult = {
+                      type: PyOutType.fsOps,
+                      // return false if operation experienced an error
+                      status: this.outBuffer.includes(ERR)
+                        ? this.outBuffer.includes("EXIST")
+                        : true,
+                    } as PyOut
+
+                    // jump to buffer clean-up and resolve as operation is now finished
+                    break
+                  }
+
+                  // avoid clean-up of buffer
+                  return
+
+                case OperationType.calcHashes:
+                  if (data.includes(EOO)) {
+                    // stop operation
+                    this.operationOngoing = OperationType.none
+
+                    this.remoteFileHashes.clear()
+                    // for each line in outBuffer
+                    for (const line of this.outBuffer
+                      // -2 for trailing \r or \n
+                      // (not needed because of hashes.length check)
+                      .slice(0, -EOO.length - 2)
+                      .toString("utf-8")
+                      .split("\n")) {
+                      if (line.length < 4) {
+                        continue
+                      }
+
+                      const result = JSON.parse(
+                        line.trim().replaceAll("\r", "")
+                      )
+
+                      if (!("error" in result)) {
+                        this.remoteFileHashes.set(result.file, result.hash)
+                      } else {
+                        console.debug(
+                          "File not found or other error," +
+                            " like to big to calc hash for"
+                        )
+                      }
+                    }
+                    let queue: number[] | undefined
+                    // if queue is not empty save all items in var, run
+                    // this.uploadProject and readd them
+                    if (this.operationQueue.length > 0) {
+                      queue = this.operationQueue
+                      this.operationQueue = []
+                    }
+                    this.uploadProject()
+                    if (queue !== undefined) {
+                      if (this.operationQueue.length === 0) {
+                        this.operationQueue = queue
+                        break
+                      }
+
+                      // add all items from queue to operationQueue
+                      // add operationQueue item to end of queue and the operationQueue = queue
+                      // but this maybe drop other operations added to queue
+                      // while running uploadProject
+
+                      queue.push(this.operationQueue.pop()!)
+
+                      if (this.operationQueue.length !== 0) {
+                        for (const item of this.operationQueue) {
+                          queue.push(item)
+                        }
+                      }
+
+                      this.operationQueue = queue
+                    }
+
+                    break
+                  }
+
+                  return
+
+                default:
+                  console.log(`stdout: ${this.outBuffer.toString("utf-8")}`)
+                  break
+              }
+
+              // flush outBuffer
+              this.outBuffer = Buffer.alloc(0)
+
+              // operation finished
+              if (this.operationOngoing === OperationType.none) {
+                this.proc.stdout.removeAllListeners()
+                this.processNextOperation()
+                resolve(opResult)
+              }
+            }
+          })
+        }
+      })
+
+      this.addOperation(opId)
     })
-
-    return !errOccured
   }
 
-  private addOperation(op: PyOperation): void {
-    this.operationQueue.push(op)
+  private async addOperation(id: number): Promise<void> {
+    this.operationQueue.push(id)
+
     if (!this.processingOperation) {
       this.processNextOperation()
     }
@@ -499,9 +582,10 @@ export class PyboardRunner {
     // Acquire lock
     this.processingOperation = true
 
-    const op: PyOperation | undefined = this.operationQueue.shift()
+    const op: number | undefined = this.operationQueue.shift()
     if (op) {
-      op.callback(this.runCommand.bind(this))
+      this.runningOperation = op
+      this.emit(`${PyboardRunnerEvents.nextOperation}_${op}`)
     }
   }
 
@@ -511,50 +595,66 @@ export class PyboardRunner {
    * @param command The command to be executed on the remote host
    * @returns If the operation was successfully started
    */
-  public executeCommand(command: string): void {
+  public async executeCommand(
+    command: string,
+    follow: (data: string) => void
+  ): Promise<PyOut> {
     if (!this.pipeConnected) {
-      return
+      return { type: PyOutType.none }
     }
 
-    this.addOperation({
-      callback: (runCommand) => {
-        runCommand(
-          {
-            command: "command",
-            args: {
-              command: command,
-            },
-          },
-          OperationType.command
-        )
+    return this.runCommand(
+      {
+        command: "command",
+        args: {
+          command: command,
+        },
       },
-    })
+      OperationType.command,
+      follow
+    )
+  }
+
+  public async executeFriendlyCommand(
+    command: string,
+    follow: (data: string) => void
+  ): Promise<PyOut> {
+    if (!this.pipeConnected) {
+      return { type: PyOutType.none }
+    }
+
+    return this.runCommand(
+      {
+        command: "friendly_command",
+        args: {
+          command: command,
+        },
+      },
+      OperationType.friendlyCommand,
+      follow
+    )
   }
 
   /**
    * Lists the contents of a directory on the remote host (non-recursive)
    *
    * @param remotePath The path on remote to directory to be scaned
-   * @returns If the operation was successfully started
+   * @returns Array of [filename, isDirectory]
    */
-  public listContents(remotePath: string): void {
+  public async listContents(remotePath: string): Promise<PyOut> {
     if (!this.pipeConnected) {
-      return
+      return { type: PyOutType.none }
     }
 
-    this.addOperation({
-      callback: (runCommand) => {
-        runCommand(
-          {
-            command: "list_contents",
-            args: {
-              target: remotePath,
-            },
-          },
-          OperationType.listContents
-        )
+    return this.runCommand(
+      {
+        command: "list_contents",
+        args: {
+          target: remotePath,
+        },
       },
-    })
+      OperationType.listContents
+    )
   }
 
   /**
@@ -568,13 +668,13 @@ export class PyboardRunner {
    * remaining path will be appended to the target path for each file
    * @returns If the operation was successfully started
    */
-  public uploadFiles(
+  public async uploadFiles(
     files: string[],
     target: string,
     localBaseDir?: string
-  ): void {
+  ): Promise<PyOut> {
     if (!this.pipeConnected) {
-      return
+      return { type: PyOutType.none }
     }
 
     const command: Command = {
@@ -589,11 +689,7 @@ export class PyboardRunner {
       command.args.local_base_dir = localBaseDir
     }
 
-    this.addOperation({
-      callback: (runCommand) => {
-        runCommand(command, OperationType.uploadFiles)
-      },
-    })
+    return this.runCommand(command, OperationType.uploadFiles)
   }
 
   /**
@@ -604,25 +700,21 @@ export class PyboardRunner {
    * @param target The target folder. If files count is 1, this can be used as local target file
    * @returns If the operation was successfully started
    */
-  public downloadFiles(files: string[], target: string): void {
+  public async downloadFiles(files: string[], target: string): Promise<PyOut> {
     if (!this.pipeConnected) {
-      return
+      return { type: PyOutType.none }
     }
 
-    this.addOperation({
-      callback: (runCommand) => {
-        runCommand(
-          {
-            command: "download_files",
-            args: {
-              files: files,
-              local: target,
-            },
-          },
-          OperationType.downloadFiles
-        )
+    return this.runCommand(
+      {
+        command: "download_files",
+        args: {
+          files: files,
+          local: target,
+        },
       },
-    })
+      OperationType.downloadFiles
+    )
   }
 
   /**
@@ -633,24 +725,20 @@ export class PyboardRunner {
    *
    * @param files The files on the remote to delete. Does not require ':' prefix
    */
-  public deleteFiles(files: string[]): void {
+  public async deleteFiles(files: string[]): Promise<PyOut> {
     if (!this.pipeConnected) {
-      return
+      return { type: PyOutType.none }
     }
 
-    this.addOperation({
-      callback: (runCommand) => {
-        runCommand(
-          {
-            command: "delete_files",
-            args: {
-              files: files,
-            },
-          },
-          OperationType.deleteFiles
-        )
+    return this.runCommand(
+      {
+        command: "delete_files",
+        args: {
+          files: files,
+        },
       },
-    })
+      OperationType.deleteFiles
+    )
   }
 
   /**
@@ -659,24 +747,20 @@ export class PyboardRunner {
    * @param folders The folders to create on the remote host
    * @returns If the operation was successfully started
    */
-  public createFolders(folders: string[]): void {
+  public async createFolders(folders: string[]): Promise<PyOut> {
     if (!this.pipeConnected) {
-      return
+      return { type: PyOutType.none }
     }
 
-    this.addOperation({
-      callback: (runCommand) => {
-        runCommand(
-          {
-            command: "mkdirs",
-            args: {
-              folders: folders,
-            },
-          },
-          OperationType.createFolders
-        )
+    return this.runCommand(
+      {
+        command: "mkdirs",
+        args: {
+          folders: folders,
+        },
       },
-    })
+      OperationType.createFolders
+    )
   }
 
   /**
@@ -685,24 +769,20 @@ export class PyboardRunner {
    * @param folders The folders on the remote to delete. Does not require ':' prefix
    * @returns If the operation was successfully started
    */
-  public deleteFolders(folders: string[]): void {
+  public async deleteFolders(folders: string[]): Promise<PyOut> {
     if (!this.pipeConnected) {
-      return
+      return { type: PyOutType.none }
     }
 
-    this.addOperation({
-      callback: (runCommand) => {
-        runCommand(
-          {
-            command: "rmdirs",
-            args: {
-              folders: folders,
-            },
-          },
-          OperationType.deleteFolders
-        )
+    return this.runCommand(
+      {
+        command: "rmdirs",
+        args: {
+          folders: folders,
+        },
       },
-    })
+      OperationType.deleteFolders
+    )
   }
 
   /**
@@ -711,24 +791,20 @@ export class PyboardRunner {
    * @param folder The folder on the remote to delete. Does not require ':' prefix
    * @returns If the operation was successfully started
    */
-  public deleteFolderRecursive(folder: string): void {
+  public async deleteFolderRecursive(folder: string): Promise<PyOut> {
     if (!this.pipeConnected) {
-      return
+      return { type: PyOutType.none }
     }
 
-    this.addOperation({
-      callback: (runCommand) => {
-        runCommand(
-          {
-            command: "rmtree",
-            args: {
-              folders: [folder],
-            },
-          },
-          OperationType.deleteFolderRecursive
-        )
+    return this.runCommand(
+      {
+        command: "rmtree",
+        args: {
+          folders: [folder],
+        },
       },
-    })
+      OperationType.deleteFolderRecursive
+    )
   }
 
   /**
@@ -744,11 +820,11 @@ export class PyboardRunner {
    * @param fileTypes File types to upload. Empty array for all
    * @param ignoredItems Items to ignore
    */
-  public startUploadingProject(
+  public async startUploadingProject(
     projectFolder: string,
     fileTypes: string[],
     ignoredItems: string[]
-  ): void {
+  ): Promise<PyOut> {
     /*const localHashes = await generateFileHashes(
       projectFolder,
       fileTypes,
@@ -764,25 +840,21 @@ export class PyboardRunner {
     this.localFileHashes = localHashes
     this.projectRoot = projectFolder
 
-    this.addOperation({
-      callback: (runCommand) => {
-        runCommand(
-          {
-            command: "calc_file_hashes",
-            args: {
-              files: Array.from(localHashes.keys(), (file) =>
-                // clear out any Windows style and duble slashes
-                file.replace("\\", "/").replace("//", "/")
-              ),
-            },
-          },
-          OperationType.calcHashes
-        )
+    return this.runCommand(
+      {
+        command: "calc_file_hashes",
+        args: {
+          files: Array.from(localHashes.keys(), (file) =>
+            // clear out any Windows style and duble slashes
+            file.replace("\\", "/").replace("//", "/")
+          ),
+        },
       },
-    })
+      OperationType.calcHashes
+    )
   }
 
-  private uploadProject(): void {
+  private async uploadProject(): Promise<PyOut> {
     const filesToUpload = [...this.localFileHashes.keys()]
       .filter(
         (file) =>
@@ -792,16 +864,18 @@ export class PyboardRunner {
       .map((file) => path.join(this.projectRoot, file), this)
 
     if (filesToUpload.length > 0) {
-      this.uploadFiles(filesToUpload, ":", this.projectRoot)
+      return this.uploadFiles(filesToUpload, ":", this.projectRoot)
     }
+
+    return { type: PyOutType.none }
   }
 
   /**
    * Downloads all files from the remote host to the project root
    */
-  // TODO!!!!!!! the cp upload of pyboard.py does not keep the folders it puts all files in root
   public downloadProject(projectRoot: string): void {
     //this.downloadFiles(":", this.projectRoot)
+    //this.downloadProjectRecursive(projectRoot, ":")
   }
 
   /**

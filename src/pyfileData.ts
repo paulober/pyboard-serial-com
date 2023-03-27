@@ -4,6 +4,10 @@ export default interface PyFileData {
      */
     path: string
     /**
+     * Is Directory
+     */
+    isDir: boolean
+    /**
      * The size of the file in bytes
      */
     size: number

@@ -3,7 +3,8 @@ import type PyFileData from "./pyfileData"
 export enum PyOutType {
     none,
     portsScan,
-    command,
+    commandWithResponse,
+    commandResult,
     listContents,
     fsOps
 }
@@ -12,9 +13,14 @@ export interface PyOut {
     type: PyOutType
 }
 
-export interface PyOutCommand extends PyOut {
-    type: PyOutType.command
+export interface PyOutCommandWithResponse extends PyOut {
+    type: PyOutType.commandWithResponse
     response: string
+}
+
+export interface PyOutCommandResult extends PyOut {
+    type: PyOutType.commandResult
+    result: boolean
 }
 
 export interface PyOutListContents extends PyOut {

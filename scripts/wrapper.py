@@ -3,8 +3,10 @@ import sys
 import json
 import pyboard as pyboard
 import mpyFunctions
+import ast
 
 EOO = "!!EOO!!"  # End of operation
+ERR = "!!ERR!!"  # Error
 SUPPORTED_USB_PIDS: list[int] = [
     0x0005,  # Raspberry Pi Pico MicroPython firmware (CDC)
 ]
@@ -256,10 +258,31 @@ def hash_file(file):
             self.pyb.exec_raw_no_follow(buf)
             ret_err = None
         if ret_err:
-            self.pyb.exit_raw_repl()
-            self.pyb.close()
+            # don't want script to crash because of an error
+            #self.pyb.exit_raw_repl()
+            #self.pyb.close()
+            #pyboard.stdout_write_bytes(ret_err)
+            #sys.exit(1)
+
+            print(ERR, flush=True)
+
+    def exec_friendly(self, cmd: str):
+        try:
+            code_ast = ast.parse(cmd, mode='eval')
+            wrapped_code = 'print({})'.format(cmd)
+        except SyntaxError:
+            wrapped_code = cmd
+
+        buf = wrapped_code.encode("utf-8")
+        ret, ret_err = self.pyb.exec_raw(
+            buf, timeout=None, data_consumer=pyboard.stdout_write_bytes
+        )
+        if ret_err:
             pyboard.stdout_write_bytes(ret_err)
-            sys.exit(1)
+
+    def stop_running_stuff(self):
+        # ctrl-C twice: interrupt any running program
+        self.pyb.serial.write(b"\r\x03\x03")
 
 
 if __name__ == "__main__":
@@ -342,6 +365,12 @@ if __name__ == "__main__":
             elif line["command"] == "command" and "command" in line["args"]:
                 # [5:] to remove the ".cmd " from the start of the string
                 wrapper.exec_cmd(line["args"]["command"])
+
+            elif line["command"] == "friendly_command" and "command" in line["args"]:
+                wrapper.exec_friendly(line["args"]["command"])
+
+            elif line["command"] == "double_ctrlc":
+                wrapper.stop_running_stuff()
 
             elif line["command"] == "list_contents" and "target" in line["args"]:
                 wrapper.list_contents(line["args"]["target"])
