@@ -5,6 +5,7 @@ import type {
   PyOut,
   PyOutCommandResult,
   PyOutCommandWithResponse,
+  PyOutListContents,
   PyOutPortsScan,
 } from "./pyout"
 import { PyOutType } from "./pyout"
@@ -12,6 +13,7 @@ import type PyFileData from "./pyfileData"
 import type { ScanOptions } from "./generateFileHashes"
 import { scanFolder } from "./generateFileHashes"
 import { EventEmitter } from "events"
+import { createFolderStructure } from "./utils"
 
 const EOO: string = "!!EOO!!"
 // This string is also hardcoded into pyboard.py at various places
@@ -42,6 +44,7 @@ type Command = {
     | "friendly_command"
     | "double_ctrlc"
     | "list_contents"
+    | "list_contents_recursive"
     | "upload_files"
     | "download_files"
     | "delete_files"
@@ -60,6 +63,7 @@ type Command = {
     remote?: string
     // eslint-disable-next-line @typescript-eslint/naming-convention
     local_base_dir?: string
+    verbose?: boolean
   }
 }
 
@@ -125,7 +129,7 @@ export class PyboardRunner extends EventEmitter {
     err: (data: Buffer | undefined) => void,
     exit: (code: number, signal: string) => void,
     pythonExe: string = "default",
-    scanOutput?: ((data: PyOutPortsScan) => void)
+    scanOutput?: (data: PyOutPortsScan) => void
   ) {
     super()
 
@@ -312,7 +316,7 @@ export class PyboardRunner extends EventEmitter {
   private async runCommand(
     command: Command,
     operationType: OperationType,
-    follow: ((data: string) => void) | null = null
+    follow?: (data: string) => void
   ): Promise<PyOut> {
     if (!this.pipeConnected) {
       return { type: PyOutType.none } as PyOut
@@ -345,6 +349,15 @@ export class PyboardRunner extends EventEmitter {
           this.processNextOperation()
           resolve({ type: PyOutType.none } as PyOut)
         } else {
+          let fsOpsProgress: number = 0
+
+          type ProgressData = {
+            written: number
+            total: number
+          }
+
+          let previousProgress: ProgressData | undefined
+
           // listen for operation output
           this.proc.stdout.addListener("data", (data: Buffer) => {
             this.outBuffer = Buffer.concat(
@@ -374,12 +387,12 @@ export class PyboardRunner extends EventEmitter {
                       // remove EOO from data (-4 because \n before and after EOO)
                       this.outBuffer = this.outBuffer.slice(0, -EOO.length - 4)
 
-                      if (follow !== null) {
+                      if (follow) {
                         follow(this.outBuffer.toString("utf-8"))
                       }
                     }
 
-                    if (follow !== null) {
+                    if (follow) {
                       opResult = {
                         type: PyOutType.commandResult,
                         result: true,
@@ -393,7 +406,7 @@ export class PyboardRunner extends EventEmitter {
                     }
                   } else {
                     // either keep in buffer or write into cb and clean buffer
-                    if (follow !== null) {
+                    if (follow) {
                       follow(this.outBuffer.toString("utf-8"))
                     }
                     // if not follow result has to be kept in buffer so return to avoid clean-up
@@ -416,11 +429,8 @@ export class PyboardRunner extends EventEmitter {
                       // (not needed because of parts.length check)
                       .slice(0, -EOO.length)
                       .toString("utf-8")
-                      .split("\n")) {
-                      const parts: string[] = line
-                        .trimStart()
-                        .replaceAll("\r", "")
-                        .split(" ")
+                      .split("\r\n")) {
+                      const parts: string[] = line.trimStart().split(" ")
 
                       // TODO: maybe merge parts with index 2 and up
                       // to support file names with spaces
@@ -470,6 +480,46 @@ export class PyboardRunner extends EventEmitter {
 
                     // jump to buffer clean-up and resolve as operation is now finished
                     break
+                  } else if (command.args.verbose && follow) {
+                    // if verbose mode is on, then interpret output as progress
+                    const jsonString: string = this.outBuffer.toString("utf-8")
+
+                    // calculate progress
+
+                    if (
+                      jsonString.includes(ERR) ||
+                      jsonString.includes("!!Exception!!")
+                    ) {
+                      // avoid > and < checks for next file progress
+                      previousProgress = undefined
+
+                      fsOpsProgress++
+                      break
+                    } else {
+                      const progData: ProgressData = JSON.parse(jsonString)
+
+                      const { written, total } = progData
+
+                      if (previousProgress === undefined) {
+                        previousProgress = progData
+                      } else if (
+                        previousProgress?.written > written ||
+                        previousProgress?.total !== total
+                      ) {
+                        fsOpsProgress++
+                      }
+
+                      const progress = Math.round((written / total) * 100)
+
+                      follow?.(
+                        `${command.args.files?.[fsOpsProgress]}: ${progress}%`
+                      )
+
+                      previousProgress = progData
+
+                      // clean-up buffer as current progress is not needed anymore
+                      break
+                    }
                   }
 
                   // avoid clean-up of buffer
@@ -478,7 +528,7 @@ export class PyboardRunner extends EventEmitter {
                 case OperationType.calcHashes:
                   if (data.includes(EOO)) {
                     // stop operation
-                    this.operationOngoing = OperationType.none
+                    //this.operationOngoing = OperationType.none
 
                     this.remoteFileHashes.clear()
                     // for each line in outBuffer
@@ -492,11 +542,10 @@ export class PyboardRunner extends EventEmitter {
                         continue
                       }
 
-                      const result = JSON.parse(
-                        line.trim().replaceAll("\r", "")
-                      )
-
-                      if (!("error" in result)) {
+                      if (!line.includes("error") && !line.includes(ERR)) {
+                        const result = JSON.parse(
+                          line.trim().replaceAll("\r", "")
+                        )
                         this.remoteFileHashes.set(result.file, result.hash)
                       } else {
                         console.debug(
@@ -504,35 +553,6 @@ export class PyboardRunner extends EventEmitter {
                             " like to big to calc hash for"
                         )
                       }
-                    }
-                    let queue: number[] | undefined
-                    // if queue is not empty save all items in var, run
-                    // this.uploadProject and readd them
-                    if (this.operationQueue.length > 0) {
-                      queue = this.operationQueue
-                      this.operationQueue = []
-                    }
-                    this.uploadProject()
-                    if (queue !== undefined) {
-                      if (this.operationQueue.length === 0) {
-                        this.operationQueue = queue
-                        break
-                      }
-
-                      // add all items from queue to operationQueue
-                      // add operationQueue item to end of queue and the operationQueue = queue
-                      // but this maybe drop other operations added to queue
-                      // while running uploadProject
-
-                      queue.push(this.operationQueue.pop()!)
-
-                      if (this.operationQueue.length !== 0) {
-                        for (const item of this.operationQueue) {
-                          queue.push(item)
-                        }
-                      }
-
-                      this.operationQueue = queue
                     }
 
                     break
@@ -549,10 +569,35 @@ export class PyboardRunner extends EventEmitter {
               this.outBuffer = Buffer.alloc(0)
 
               // operation finished
-              if (this.operationOngoing === OperationType.none) {
+              if (
+                this.operationOngoing === OperationType.none ||
+                this.operationOngoing === OperationType.calcHashes
+              ) {
                 this.proc.stdout.removeAllListeners()
+                const opIsCalcHashes = this.operationOngoing === OperationType.calcHashes
+                this.operationOngoing = OperationType.none
                 this.processNextOperation()
-                resolve(opResult)
+
+                // to avoid calling resolve after calc hashes as it's not
+                if (!opIsCalcHashes) {
+                  resolve(opResult)
+                }
+                else {
+                  // add operation to queue and wait
+                  if (follow) {
+                    this.uploadProject(follow).then((data: PyOut) => {
+                      resolve(data)
+                    }).catch(() => {
+                      resolve({ type: PyOutType.fsOps, status: false} as PyOut)
+                    })
+                  } else {
+                    this.uploadProject().then((data: PyOut) => {
+                      resolve(data)
+                    }).catch(() => {
+                      resolve({ type: PyOutType.fsOps, status: false} as PyOut)
+                    })
+                  }
+                }
               }
             }
           })
@@ -623,6 +668,8 @@ export class PyboardRunner extends EventEmitter {
       return { type: PyOutType.none }
     }
 
+    // does not need verbose to be set as follow will
+    // be respected by stdout listener
     return this.runCommand(
       {
         command: "friendly_command",
@@ -635,11 +682,12 @@ export class PyboardRunner extends EventEmitter {
     )
   }
 
+  // TODO: maybe return PyOut... instead of PyOut to reduce checks and casts
   /**
    * Lists the contents of a directory on the remote host (non-recursive)
    *
    * @param remotePath The path on remote to directory to be scaned
-   * @returns Array of [filename, isDirectory]
+   * @returns PyOutListContents object
    */
   public async listContents(remotePath: string): Promise<PyOut> {
     if (!this.pipeConnected) {
@@ -649,6 +697,28 @@ export class PyboardRunner extends EventEmitter {
     return this.runCommand(
       {
         command: "list_contents",
+        args: {
+          target: remotePath,
+        },
+      },
+      OperationType.listContents
+    )
+  }
+
+  /**
+   * Lists the contents of a directory on the remote host (non-recursive)
+   *
+   * @param remotePath The path on remote to directory to be scaned
+   * @returns PyOutListContents object
+   */
+  public async listContentsRecursive(remotePath: string): Promise<PyOut> {
+    if (!this.pipeConnected) {
+      return { type: PyOutType.none }
+    }
+
+    return this.runCommand(
+      {
+        command: "list_contents_recursive",
         args: {
           target: remotePath,
         },
@@ -671,7 +741,8 @@ export class PyboardRunner extends EventEmitter {
   public async uploadFiles(
     files: string[],
     target: string,
-    localBaseDir?: string
+    localBaseDir?: string,
+    follow?: (data: string) => void
   ): Promise<PyOut> {
     if (!this.pipeConnected) {
       return { type: PyOutType.none }
@@ -682,6 +753,7 @@ export class PyboardRunner extends EventEmitter {
       args: {
         files: files,
         remote: target,
+        verbose: !!follow,
       },
     }
 
@@ -689,7 +761,7 @@ export class PyboardRunner extends EventEmitter {
       command.args.local_base_dir = localBaseDir
     }
 
-    return this.runCommand(command, OperationType.uploadFiles)
+    return this.runCommand(command, OperationType.uploadFiles, follow)
   }
 
   /**
@@ -700,7 +772,11 @@ export class PyboardRunner extends EventEmitter {
    * @param target The target folder. If files count is 1, this can be used as local target file
    * @returns If the operation was successfully started
    */
-  public async downloadFiles(files: string[], target: string): Promise<PyOut> {
+  public async downloadFiles(
+    files: string[],
+    target: string,
+    follow?: (data: string) => void
+  ): Promise<PyOut> {
     if (!this.pipeConnected) {
       return { type: PyOutType.none }
     }
@@ -711,9 +787,11 @@ export class PyboardRunner extends EventEmitter {
         args: {
           files: files,
           local: target,
+          verbose: !!follow,
         },
       },
-      OperationType.downloadFiles
+      OperationType.downloadFiles,
+      follow
     )
   }
 
@@ -823,7 +901,8 @@ export class PyboardRunner extends EventEmitter {
   public async startUploadingProject(
     projectFolder: string,
     fileTypes: string[],
-    ignoredItems: string[]
+    ignoredItems: string[],
+    follow?: (data: string) => void
   ): Promise<PyOut> {
     /*const localHashes = await generateFileHashes(
       projectFolder,
@@ -840,6 +919,9 @@ export class PyboardRunner extends EventEmitter {
     this.localFileHashes = localHashes
     this.projectRoot = projectFolder
 
+    // only parse follow not set verbose as calc_file_hashes
+    // operation does not support verbose but
+    // OperationType.calcHashes followed upload operation supports it
     return this.runCommand(
       {
         command: "calc_file_hashes",
@@ -850,11 +932,12 @@ export class PyboardRunner extends EventEmitter {
           ),
         },
       },
-      OperationType.calcHashes
+      OperationType.calcHashes,
+      follow
     )
   }
 
-  private async uploadProject(): Promise<PyOut> {
+  private async uploadProject(follow?: (data: string) => void): Promise<PyOut> {
     const filesToUpload = [...this.localFileHashes.keys()]
       .filter(
         (file) =>
@@ -864,7 +947,7 @@ export class PyboardRunner extends EventEmitter {
       .map((file) => path.join(this.projectRoot, file), this)
 
     if (filesToUpload.length > 0) {
-      return this.uploadFiles(filesToUpload, ":", this.projectRoot)
+      return this.uploadFiles(filesToUpload, ":", this.projectRoot, follow)
     }
 
     return { type: PyOutType.none }
@@ -873,9 +956,26 @@ export class PyboardRunner extends EventEmitter {
   /**
    * Downloads all files from the remote host to the project root
    */
-  public downloadProject(projectRoot: string): void {
+  public async downloadProject(
+    projectRoot: string,
+    follow?: (data: string) => void
+  ): Promise<PyOut> {
     //this.downloadFiles(":", this.projectRoot)
     //this.downloadProjectRecursive(projectRoot, ":")
+    const contents = await this.listContentsRecursive("/")
+
+    if (contents.type !== PyOutType.listContents) {
+      return { type: PyOutType.none }
+    }
+
+    const filePaths = (contents as PyOutListContents).response.map(
+      (f) => f.path
+    )
+
+    // redundant as downloadFiles in wrapper also does this
+    //await createFolderStructure(filePaths, projectRoot)
+
+    return this.downloadFiles(filePaths, projectRoot, follow)
   }
 
   /**

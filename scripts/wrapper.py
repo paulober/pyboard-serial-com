@@ -1,9 +1,11 @@
+from collections import defaultdict
 import os
 import sys
 import json
 import pyboard as pyboard
 import mpyFunctions
 import ast
+from utils import create_folder_structure
 
 EOO = "!!EOO!!"  # End of operation
 ERR = "!!ERR!!"  # Error
@@ -72,6 +74,10 @@ def get_directories_to_create(file_paths):
     for file_path in file_paths:
         dir = os.path.dirname(file_path)
         yield (file_path, dir)
+
+
+def fs_progress_callback(written: int, total: int):
+    print(f"{{\"written\": {written}, \"total\": {total}}}", flush=True)
 ##################################
 ########## END Utils #############
 ##################################
@@ -104,7 +110,15 @@ class Wrapper:
             target = ":" + target
         pyboard.filesystem_command(self.pyb, ["ls", target])
 
-    def upload_files(self, local: list[str], remote: str = None, local_base_dir: str = None):
+    def list_contents_recursive(self, folder: str):
+        """Lists all files in the given folder and subfolders.
+
+        Args:
+            folder (str): The path to the folder to list the files of.
+        """
+        pyboard.filesystem_command(self.pyb, ["ls_recursive", folder])
+
+    def upload_files(self, local: list[str], remote: str = None, local_base_dir: str = None, verbose: bool = False):
         """Uploads (a) file(s) to the pico.
 
         Args:
@@ -139,18 +153,60 @@ class Wrapper:
                 # remate + dir_path and not remote+dest[1] because pyboard would even if only one file is uploaded
                 # treat remote as directory and not as a target file name if it ends with a slash
                 # remote + dir_path because dir_path is relative to the remote path
-                pyboard.filesystem_command(self.pyb, ["cp", dest[0], remote+dir_path+"/"])
+                if verbose:
+                    pyboard.filesystem_command(
+                        self.pyb, ["cp", dest[0], remote+dir_path+"/"],
+                        progress_callback=fs_progress_callback)
+                else:
+                    pyboard.filesystem_command(
+                        self.pyb, ["cp", dest[0], remote+dir_path+"/"])
         else:
-            pyboard.filesystem_command(self.pyb, ["cp"]+local+[remote])
+            if verbose:
+                pyboard.filesystem_command(
+                    self.pyb, ["cp"]+local+[remote], progress_callback=fs_progress_callback)
+            else:
+                pyboard.filesystem_command(self.pyb, ["cp"]+local+[remote])
 
-    def download_files(self, remote: list[str], local: str):
+    def download_files(self, remote: list[str], local: str, verbose: bool = False):
         """Downloads (a) files from the pico.
 
         Args:
             remote (str): The remote path to the file(s) to download splited by single space.
             local (str): The local path to save the file to or folder to save files to.
         """
-        pyboard.filesystem_command(self.pyb, ["cp"]+remote+[local])
+
+        if len(remote) > 1:
+            create_folder_structure(remote, local)
+
+            # if local is a directory, add a slash to the end
+            # because pyboard would even if only one file is downloaded treat local target file name
+            # if it not ends with a slash, only then it would append the filename to the local path
+            if local[-1] != os.path.sep:
+                local += os.path.sep
+
+            folder_files = defaultdict(list)
+
+            # Group files by folder
+            for file_path in remote:
+                folder_path, _ = file_path.rsplit('/', 1)
+                folder_files[folder_path].append(file_path)
+
+            # Call pyboard.filesystem_command for each folder and its files
+            for folder_path, files in folder_files.items():
+                # if local is a directory, add a slash to the end, because see above
+                target = os.path.join(local, folder_path.lstrip(
+                    ':').lstrip('/'))+os.path.sep
+                if verbose:
+                    pyboard.filesystem_command(
+                        self.pyb, ["cp"] + files + [target], progress_callback=fs_progress_callback)
+                else:
+                    pyboard.filesystem_command(self.pyb, ["cp"] + files + [target])
+        else:
+            if verbose:
+                pyboard.filesystem_command(
+                    self.pyb, ["cp"]+remote+[local], progress_callback=fs_progress_callback)
+            else:
+                pyboard.filesystem_command(self.pyb, ["cp"]+remote+[local])
 
     def delete_files(self, files: list[str]):
         """Deletes (a) file(s) on the pico.
@@ -259,10 +315,10 @@ def hash_file(file):
             ret_err = None
         if ret_err:
             # don't want script to crash because of an error
-            #self.pyb.exit_raw_repl()
-            #self.pyb.close()
-            #pyboard.stdout_write_bytes(ret_err)
-            #sys.exit(1)
+            # self.pyb.exit_raw_repl()
+            # self.pyb.close()
+            # pyboard.stdout_write_bytes(ret_err)
+            # sys.exit(1)
 
             print(ERR, flush=True)
 
@@ -375,31 +431,36 @@ if __name__ == "__main__":
             elif line["command"] == "list_contents" and "target" in line["args"]:
                 wrapper.list_contents(line["args"]["target"])
 
+            elif line["command"] == "list_contents_recursive" and "target" in line["args"]:
+                wrapper.list_contents_recursive(line["args"]["target"])
+
             #################################
             ## Download files with pyboard ##
             #################################
             elif line["command"] == "download_files" and "files" in line["args"] \
                     and "local" in line["args"]:
+                verbose = "verbose" in line["args"] and line["args"]["verbose"] == True
                 if len(line["args"]["files"]) == 1:
                     wrapper.download_files(
-                        [sanitize_remote(line["args"]["files"][0])], line["args"]["local"])
+                        [sanitize_remote(line["args"]["files"][0])], line["args"]["local"], verbose)
                 else:
                     # if more files in the list, the local path is the folder to save the files to and join the files with spaces
                     # [sanitize_remote(f) for f in line["args"]["files"]] is a bit slower thant sanitize_remote_v2(line["args"]["files"])
                     wrapper.download_files(sanitize_remote_v2(
-                        line["args"]["files"]), line["args"]["local"])
+                        line["args"]["files"]), line["args"]["local"], verbose)
 
             #################################
             ### Upload files with pyboard ###
             #################################
             elif line["command"] == "upload_files" and "files" in line["args"] \
                     and "remote" in line["args"]:
+                verbose = "verbose" in line["args"] and line["args"]["verbose"] == True
                 if "local_base_dir" in line["args"]:
                     wrapper.upload_files(line["args"]["files"], sanitize_remote(
-                        line["args"]["remote"]), line["args"]["local_base_dir"])
+                        line["args"]["remote"]), line["args"]["local_base_dir"], verbose=verbose)
                 else:
                     wrapper.upload_files(line["args"]["files"],
-                                         sanitize_remote(line["args"]["remote"]))
+                                         sanitize_remote(line["args"]["remote"]), verbose=verbose)
 
             #################################
             ### Delete files with pyboard ###

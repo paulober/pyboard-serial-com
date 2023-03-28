@@ -527,6 +527,24 @@ class Pyboard:
         )
         self.exec_(cmd, data_consumer=stdout_write_bytes)
 
+    # EDITED by paulober
+    def fs_ls_recursive(self, src):
+        cmd = (
+            "import uos\n"
+            "def recursive_ls(src):\n"
+            " for f in uos.ilistdir(src):\n"
+            "  is_dir = f[1] & 0x4000\n"
+            "  if is_dir:\n"
+            "   recursive_ls(src + ('/' if src[-1] != '/' else '') + f[0])\n"
+            "  else:\n"
+            "   path = src + ('/' if src[-1] != '/' else '') + f[0]\n"
+            "   print('{:12} {}{}'.format(f[3] if len(f) > 3 else 0, path, '/' if is_dir else ''))\n"
+            "recursive_ls(%s)\n"
+            % (("'%s'" % src) if src else "")
+        )
+        self.exec_(cmd, data_consumer=stdout_write_bytes)
+    # END EDIT
+
     def fs_listdir(self, src=""):
         buf = bytearray()
 
@@ -674,6 +692,7 @@ def deltree(target):
         deltree(current)
     except OSError:
         uos.remove(current)
+  # required for security reasons
   if target != '/':
       uos.rmdir(target)
 deltree('%s')
@@ -756,6 +775,7 @@ def filesystem_command(pyb, args, progress_callback=None, verbose=False):
                 # EDITED by paulober #
                 ######################
                 "rmdir_recursive": pyb.fs_rmdir_recursive,
+                "ls_recursive": pyb.fs_ls_recursive,
                 ######################
                 # END of edited part #
                 ######################

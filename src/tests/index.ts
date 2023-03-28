@@ -84,8 +84,7 @@ async function friendlyCommandCb(data: string): Promise<void> {
   // vscode debugging console doesn't show stdout, so we need to use console.log
   if (process.env.v8debug !== undefined) {
     console.log(data)
-  }
-  else {
+  } else {
     process.stdout.write(data)
   }
 }
@@ -102,8 +101,8 @@ process.on("SIGINT", () => {
     i--
   }
   pyboardRunner.switchDevice("COM3")
-  setTimeout(() => {
-    pyboardRunner.listContents("/").then(listDataCp)
+  setTimeout(async () => {
+    /*pyboardRunner.listContents("/").then(listDataCp)
     pyboardRunner.createFolders(["test9", "atest9"]).then((data: PyOut) => {
       if (data.type === PyOutType.fsOps) {
         const result = data as PyOutFsOps
@@ -122,7 +121,7 @@ process.on("SIGINT", () => {
       "N:\\pyboard-serial-com\\scripts\\test",
       [".py"],
       []
-    )*/
+    )*/ /*
     pyboardRunner
       .executeFriendlyCommand("print('Hello World')", friendlyCommandCb)
       .then((data: PyOut) => {
@@ -148,13 +147,60 @@ process.on("SIGINT", () => {
         }
       })
     pyboardRunner
-      .executeFriendlyCommand("while a < 50: print(a); a+=1", friendlyCommandCb)
+      .executeFriendlyCommand("while a < 8: print(a); a+=1", friendlyCommandCb)
       .then((data: PyOut) => {
         if (data.type === PyOutType.commandResult) {
           const result = data as PyOutCommandResult
           console.log(`Friendly Command result: ${result.result}`)
         }
-      })
+      })*/
+
+    pyboardRunner.deleteFolderRecursive("/").then((data: PyOut) => {
+      if (data.type === PyOutType.fsOps) {
+        const result = data as PyOutFsOps
+        console.log(`Delete folder status: ${result.status}`)
+      }
+    })
+
+    pyboardRunner.listContentsRecursive("/").then(listDataCp)
+
+    // await to avoid download will be runn after calc hashes but before upload
+    const uploadResult = await pyboardRunner.startUploadingProject(
+      "N:\\pyboard-serial-com\\scripts\\test",
+      [],
+      ["N:\\pyboard-serial-com\\scripts\\test\\downloads"],
+      (data: string) => {
+        try {
+          const json = JSON.parse(data)
+          if ("error" in json) {
+            console.log(`Calc hash error: ${json.file}`)
+          }
+        }
+        catch (e) {
+          if (data.endsWith("%")) {
+            console.log(data)
+          }
+        }
+      }
+    )
+    if (uploadResult.type === PyOutType.fsOps) {
+      const result = uploadResult as PyOutFsOps
+      console.log(`Upload project status: ${result.status}`)
+    }
+
+    pyboardRunner.listContentsRecursive("/").then(listDataCp)
+
+    pyboardRunner.downloadProject(
+      "N:\\pyboard-serial-com\\scripts\\test\\downloads",
+      (data: string) => {
+        console.log(data)
+      }
+    ).then((data: PyOut) => {
+      if (data.type === PyOutType.fsOps) {
+        const result = data as PyOutFsOps
+        console.log(`Download project status: ${result.status}`)
+      }
+    })
   }, 700)
 })()
 ;(async function () {
