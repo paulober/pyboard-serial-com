@@ -371,11 +371,12 @@ if __name__ == "__main__":
         if args.scan_ports:
             # scan for ports with a device from SUPPORTED_USB_PIDS and print them
             ports = find_pico_ports()
-            for port in ports:
-                print(port, flush=True)
 
-            # mark scan as EOO
-            print(EOO, flush=True)
+            # print all at once so that when there are
+            # many ports the parent don't have to buffer until it
+            # has received EOO
+            print("\n".join(ports)+"\n"+EOO, flush=True)
+
             # exit the script after printing the ports to stdout
             exit(0)
 

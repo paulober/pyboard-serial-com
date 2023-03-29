@@ -13,13 +13,11 @@ import type PyFileData from "./pyfileData"
 import type { ScanOptions } from "./generateFileHashes"
 import { scanFolder } from "./generateFileHashes"
 import { EventEmitter } from "events"
-import { createFolderStructure } from "./utils"
+import { EOL } from "os"
 
 const EOO: string = "!!EOO!!"
 // This string is also hardcoded into pyboard.py at various places
 const ERR: string = "!!ERR!!"
-
-export const SCAN_DEVICE = "!!SCAN!!"
 
 enum OperationType {
   none,
@@ -72,17 +70,6 @@ enum PyboardRunnerEvents {
   nextOperation = "nextOperation",
 }
 
-function getDirectoriesToCreate(filePaths: string[]): string[] {
-  const directories = new Set<string>()
-
-  for (const filePath of filePaths) {
-    const dir = path.dirname(filePath)
-    directories.add(dir)
-  }
-
-  return Array.from(directories)
-}
-
 export class PyboardRunner extends EventEmitter {
   public proc: ChildProcessWithoutNullStreams
   private pipeConnected: boolean = false
@@ -95,7 +82,7 @@ export class PyboardRunner extends EventEmitter {
   private idCounter = 1
 
   private device: string
-  private readonly wrapperPyPath: string = path.join(
+  private static readonly WRAPPER_PY_PATH: string = path.join(
     __dirname,
     "..",
     "scripts",
@@ -128,8 +115,7 @@ export class PyboardRunner extends EventEmitter {
     device: string,
     err: (data: Buffer | undefined) => void,
     exit: (code: number, signal: string) => void,
-    pythonExe: string = "default",
-    scanOutput?: (data: PyOutPortsScan) => void
+    pythonExe: string = "default"
   ) {
     super()
 
@@ -147,17 +133,11 @@ export class PyboardRunner extends EventEmitter {
     this.device = device
     this.pythonExe = pythonExe
 
-    if (this.device === SCAN_DEVICE) {
-      console.debug("Scanning ports")
-    } else {
-      console.debug(`Connecting to ${this.device}`)
-    }
+    console.debug(`Connecting to ${this.device}`)
 
     this.proc = spawn(
       this.pythonExe,
-      this.device === SCAN_DEVICE
-        ? [this.wrapperPyPath, "--scan-ports"]
-        : [this.wrapperPyPath, "-d", this.device, "-b", "115200"],
+      [PyboardRunner.WRAPPER_PY_PATH, "-d", this.device, "-b", "115200"],
       {
         stdio: "pipe",
         windowsHide: true,
@@ -165,33 +145,8 @@ export class PyboardRunner extends EventEmitter {
       }
     )
 
-    if (this.device === SCAN_DEVICE) {
-      this.proc.stdout.on("data", (data: Buffer) => {
-        if (data.includes(EOO)) {
-          // stop operation
-          this.operationOngoing = OperationType.none
-
-          // if data contains more than EOO, then return other stuff before quitting
-          if (this.outBuffer.toString("utf-8").trim() !== EOO) {
-            // remove EOO from data (-4 because \n before and after EOO)
-            this.outBuffer = this.outBuffer.slice(0, -EOO.length - 4)
-          }
-
-          const resp: PyOutPortsScan = {
-            type: PyOutType.portsScan,
-            ports: this.outBuffer.toString("utf-8").split("\n"),
-          }
-
-          this.outBuffer = Buffer.alloc(0)
-
-          scanOutput?.(resp)
-          this.disconnect()
-        }
-
-        // avoid buffer clean-up
-        return
-      })
-    }
+    // Set the encoding for the subprocess stdin.
+    this.proc.stdin.setDefaultEncoding('utf-8')
 
     this.proc.on("spawn", () => {
       this.pipeConnected = true
@@ -212,14 +167,21 @@ export class PyboardRunner extends EventEmitter {
   }
 
   /**
-   * Duplicate of the constructor!
+   * Get the list of available serial ports of Picos connected to
+   *
+   * @param pythonExe
+   * @returns
    */
-  private spawnNewProcess(): void {
-    this.proc = spawn(
-      this.pythonExe,
-      this.device === SCAN_DEVICE
-        ? [this.wrapperPyPath, "--scan-ports"]
-        : [this.wrapperPyPath, "-d", this.device, "-b", "115200"],
+  public static async getPorts(
+    pythonExe: string = "default"
+  ): Promise<PyOutPortsScan> {
+    if (pythonExe === "default") {
+      pythonExe = process.platform === "win32" ? "python" : "python3"
+    }
+
+    const proc = spawn(
+      pythonExe,
+      [PyboardRunner.WRAPPER_PY_PATH, "--scan-ports"],
       {
         stdio: "pipe",
         windowsHide: true,
@@ -227,14 +189,52 @@ export class PyboardRunner extends EventEmitter {
       }
     )
 
+    return new Promise((resolve, reject) => {
+      proc.stdout.on("data", (data: Buffer) => {
+        // assumes that all data is printed (and recieved) at once
+        if (data.includes(EOO)) {
+          // kill child process
+          proc.kill()
+
+          // remove EOO from data (-4 because \n before and after EOO)
+          const dataStr = data.toString("utf-8").replace(EOO + EOL, "")
+
+          const resp: PyOutPortsScan = {
+            type: PyOutType.portsScan,
+            ports: dataStr.split("\n"),
+          }
+
+          resolve(resp)
+        } else {
+          reject(new Error("Invalid response"))
+        }
+      })
+    })
+  }
+
+  /**
+   * Duplicate of the constructor!
+   */
+  private spawnNewProcess(): void {
+    this.proc = spawn(
+      this.pythonExe,
+      [PyboardRunner.WRAPPER_PY_PATH, "-d", this.device, "-b", "115200"],
+      {
+        stdio: "pipe",
+        windowsHide: true,
+        cwd: path.join(__dirname, "..", "scripts"),
+      }
+    )
+
+    // Set the encoding for the subprocess stdin.
+    this.proc.stdin.setDefaultEncoding('utf-8')
+
     this.proc.on("spawn", () => {
       this.pipeConnected = true
       console.debug("Spawned")
 
       this.err(undefined)
     })
-
-    //this.proc.stdout.on("data", (data: Buffer) => this.onStdout(data))
 
     this.proc.stderr.on("data", (err: Buffer) => this.onStderr(err))
 
@@ -385,7 +385,10 @@ export class PyboardRunner extends EventEmitter {
                     // if data contains more than EOO, then return other stuff before quitting
                     if (data.toString("utf-8").trim() !== EOO) {
                       // remove EOO from data (-4 because \n before and after EOO)
-                      this.outBuffer = this.outBuffer.slice(0, -EOO.length - 4)
+                      this.outBuffer = this.outBuffer.slice(
+                        0,
+                        -EOO.length - EOL.length
+                      )
 
                       if (follow) {
                         follow(this.outBuffer.toString("utf-8"))
@@ -429,7 +432,8 @@ export class PyboardRunner extends EventEmitter {
                       // (not needed because of parts.length check)
                       .slice(0, -EOO.length)
                       .toString("utf-8")
-                      .split("\r\n")) {
+                      .replace("\r", "")
+                      .split("\n")) {
                       const parts: string[] = line.trimStart().split(" ")
 
                       // TODO: maybe merge parts with index 2 and up
@@ -493,6 +497,13 @@ export class PyboardRunner extends EventEmitter {
                       // avoid > and < checks for next file progress
                       previousProgress = undefined
 
+                      // should be done with care as there error could have
+                      // only indicated a problem with something
+                      // like the directory creation before upload
+                      // if the directory already existed
+                      // which would cause this here to think the upload
+                      // for a file failed but it actually succeeded
+                      // that has been fixed but should be always kept in mind
                       fsOpsProgress++
                       break
                     } else {
@@ -574,28 +585,38 @@ export class PyboardRunner extends EventEmitter {
                 this.operationOngoing === OperationType.calcHashes
               ) {
                 this.proc.stdout.removeAllListeners()
-                const opIsCalcHashes = this.operationOngoing === OperationType.calcHashes
+                const opIsCalcHashes =
+                  this.operationOngoing === OperationType.calcHashes
                 this.operationOngoing = OperationType.none
                 this.processNextOperation()
 
                 // to avoid calling resolve after calc hashes as it's not
                 if (!opIsCalcHashes) {
                   resolve(opResult)
-                }
-                else {
+                } else {
                   // add operation to queue and wait
                   if (follow) {
-                    this.uploadProject(follow).then((data: PyOut) => {
-                      resolve(data)
-                    }).catch(() => {
-                      resolve({ type: PyOutType.fsOps, status: false} as PyOut)
-                    })
+                    this.uploadProject(follow)
+                      .then((data: PyOut) => {
+                        resolve(data)
+                      })
+                      .catch(() => {
+                        resolve({
+                          type: PyOutType.fsOps,
+                          status: false,
+                        } as PyOut)
+                      })
                   } else {
-                    this.uploadProject().then((data: PyOut) => {
-                      resolve(data)
-                    }).catch(() => {
-                      resolve({ type: PyOutType.fsOps, status: false} as PyOut)
-                    })
+                    this.uploadProject()
+                      .then((data: PyOut) => {
+                        resolve(data)
+                      })
+                      .catch(() => {
+                        resolve({
+                          type: PyOutType.fsOps,
+                          status: false,
+                        } as PyOut)
+                      })
                   }
                 }
               }
