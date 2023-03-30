@@ -6,6 +6,9 @@ import pyboard as pyboard
 import mpyFunctions
 import ast
 from utils import create_folder_structure
+import threading
+import time
+import signal
 
 EOO = "!!EOO!!"  # End of operation
 ERR = "!!ERR!!"  # Error
@@ -78,6 +81,21 @@ def get_directories_to_create(file_paths):
 
 def fs_progress_callback(written: int, total: int):
     print(f"{{\"written\": {written}, \"total\": {total}}}", flush=True)
+
+def read_vt_sequence():
+    sequence = bytearray()
+    ch = os.read(sys.stdin.fileno(), 1)
+    sequence.extend(ch)
+    
+    if ch == b'\x1b':
+        ch = os.read(sys.stdin.fileno(), 1)
+        if ch == b'[':  # CSI (Control Sequence Introducer)
+            sequence.extend(ch)
+            while not ch.decode('utf-8').isalnum():  # Continue until an alphanumeric character is read
+                ch = os.read(sys.stdin.fileno(), 1)
+                sequence.extend(ch)
+    
+    return bytes(sequence)
 ##################################
 ########## END Utils #############
 ##################################
@@ -85,6 +103,7 @@ def fs_progress_callback(written: int, total: int):
 
 class Wrapper:
     pyb: pyboard.Pyboard = None
+    friendly: bool = False
 
     def __init__(self, device: str, baudrate: int = 115200):
         if device == "default":
@@ -99,6 +118,10 @@ class Wrapper:
 
     def exit_raw_repl(self):
         self.pyb.exit_raw_repl()
+
+    def disconnect(self):
+        # self.stop_running_stuff()
+        self.pyb.close()
 
     def list_contents(self, target: str):
         """Lists all files in the given folder.
@@ -149,6 +172,8 @@ class Wrapper:
             destinations.sort(key=lambda x: x[1].count('/'))
             for dest in destinations:
                 dir_path = os.path.dirname(dest[1])
+                # pyboard fs_mkdir has been modified so it don't cause any error if the directory already exists
+                # so that all errors thrown here will indicate to the parent that a file upload failed
                 self.mkdirs([dir_path])
                 # remate + dir_path and not remote+dest[1] because pyboard would even if only one file is uploaded
                 # treat remote as directory and not as a target file name if it ends with a slash
@@ -322,23 +347,35 @@ def hash_file(file):
 
             print(ERR, flush=True)
 
-    def exec_friendly(self, cmd: str):
-        try:
-            code_ast = ast.parse(cmd, mode='eval')
-            wrapped_code = 'print({})'.format(cmd)
-        except SyntaxError:
-            wrapped_code = cmd
-
-        buf = wrapped_code.encode("utf-8")
-        ret, ret_err = self.pyb.exec_raw(
-            buf, timeout=None, data_consumer=pyboard.stdout_write_bytes
-        )
-        if ret_err:
-            pyboard.stdout_write_bytes(ret_err)
-
     def stop_running_stuff(self):
         # ctrl-C twice: interrupt any running program
         self.pyb.serial.write(b"\r\x03\x03")
+
+
+# Define the serial port reading function
+def read_serial_port(stop_event: threading.Event):
+    while not stop_event.is_set():
+        try:
+            n = wrapper.pyb.serial.inWaiting()
+        except OSError as er:
+            if er.args[0] == 5:  # IO error, device disappeared
+                print("device disconnected")
+                break
+
+        if n > 0:
+            c = wrapper.pyb.serial.read(1)
+            if c is not None:
+                # pass character through to the console
+                oc = ord(c)
+                if oc in (8, 9, 10, 13, 27) or 32 <= oc <= 126:
+                    sys.stdout.write(c.decode("utf-8"))
+                    sys.stdout.flush()
+                else:
+                    sys.stdout.write((b"[%02x]" % ord(c)).decode("utf-8"))
+                    sys.stdout.flush()
+
+        # Add a small delay to reduce CPU usage
+        time.sleep(0.01)
 
 
 if __name__ == "__main__":
@@ -363,6 +400,11 @@ if __name__ == "__main__":
         action="store_true",
         dest="scan_ports",
     )
+    cmd_parser.add_argument(
+        "--friendly-repl",
+        action="store_true",
+        dest="friendly",
+    )
 
     args = cmd_parser.parse_args()
 
@@ -380,19 +422,72 @@ if __name__ == "__main__":
             # exit the script after printing the ports to stdout
             exit(0)
 
+        if args.device == "default":
+            sys.exit(1)
+
         wrapper = Wrapper(args.device, args.baudrate)
 
+        # register a signal handler to responsible close the os handle for the port
+        signal.signal(signal.SIGINT, lambda s, f: wrapper.disconnect())
+
+        # enter raw repl (better for programmatic use, aka bot chating with bot)
         wrapper.enter_raw_repl(True)
+
+        # enable frindly repl on start-up if requested
+        if args.friendly:
+            wrapper.friendly = True
+            wrapper.pyb.exit_raw_repl()
 
         # wait for input into stdin
         while True:
+            # frendly REPL loop (ctrl-] to exit)
+            if wrapper.friendly:
+                # Set up an event object to signal the thread to stop
+                stop_event = threading.Event()
+                # Set up the thread to read the serial port
+                serial_thread = threading.Thread(target=read_serial_port, args=(stop_event,))
+                # Set as a daemon thread to exit when the main program exits
+                serial_thread.daemon = True
+
+                # catch raw repl entry/prompt
+                wrapper.pyb.serial.read(1)
+
+                serial_thread.start()
+
+                while True:
+                    c = read_vt_sequence()
+                    if c == b"\x1d":  # ctrl-], quit
+                        break
+                    elif c == "\x04": # ctrl-D, end of file
+                        pass
+                    else:
+                        wrapper.pyb.serial.write(c)
+
+                    # Add a small delay to reduce CPU usage
+                    time.sleep(0.01)
+
+                # Signal the thread to stop and wait for it to terminate
+                stop_event.set()
+                serial_thread.join()
+
+                # reset friendly flag
+                wrapper.friendly = False
+                
+                # stop running stuff if user started something and
+                # then exited friendly mode by ctrl-] with it sent to 
+                # the board could cause problems
+                wrapper.stop_running_stuff()
+
+                # TODO: raw repl entry will print to user and cause a JSONDecodeError
+                wrapper.pyb.enter_raw_repl(False)
+
             line = input()
 
             # check if input is json and if so, parse it
             try:
                 line = json.loads(line)
             except json.decoder.JSONDecodeError:
-                print("!!JSONDecodeError!!")
+                print("!!JSONDecodeError!!", flush=True)
                 continue
 
             if "command" not in line:
@@ -401,6 +496,7 @@ if __name__ == "__main__":
             if line["command"] == "exit":
                 wrapper.pyb.close()
                 exit(0)
+
             elif line["command"] == "status":
                 # average 0.00154s
                 # wrapper.exec_cmd("print('OK')", False)
@@ -415,6 +511,7 @@ if __name__ == "__main__":
                 if not found:
                     wrapper.pyb.close()
                     raise SerialException
+                print("OK", flush=True)
 
             elif line["command"] == "soft_reset":
                 wrapper.soft_reset()
@@ -422,9 +519,6 @@ if __name__ == "__main__":
             elif line["command"] == "command" and "command" in line["args"]:
                 # [5:] to remove the ".cmd " from the start of the string
                 wrapper.exec_cmd(line["args"]["command"])
-
-            elif line["command"] == "friendly_command" and "command" in line["args"]:
-                wrapper.exec_friendly(line["args"]["command"])
 
             elif line["command"] == "double_ctrlc":
                 wrapper.stop_running_stuff()
@@ -505,6 +599,10 @@ if __name__ == "__main__":
 
             elif line["command"] == "get_item_stat" and "item" in line["args"]:
                 wrapper.get_item_stat(line["args"]["item"])
+
+            elif line["command"] == "get_friendly":
+                wrapper.friendly = True
+                wrapper.pyb.exit_raw_repl()
 
             else:
                 print("!!Unknown command!!", flush=True)

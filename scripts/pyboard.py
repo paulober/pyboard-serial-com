@@ -495,9 +495,10 @@ class Pyboard:
             return ret
 
     # In Python3, call as pyboard.exec(), see the setattr call below.
-    def exec_(self, command, data_consumer=None):
+    # Modified by paulober | added silent_fail parameter to avoid raising exception
+    def exec_(self, command, data_consumer=None, silent_fail=False):
         ret, ret_err = self.exec_raw(command, data_consumer=data_consumer)
-        if ret_err:
+        if ret_err and not silent_fail:
             raise PyboardError("exception", ret, ret_err)
         return ret
 
@@ -668,7 +669,10 @@ class Pyboard:
         self.exec_("f.close()")
 
     def fs_mkdir(self, dir):
-        self.exec_("import uos\nuos.mkdir('%s')" % dir)
+        # Modified by paulober | added True for silent_fail parameter
+        # so mkdir will not return an EEXIST error to wrapper and so to the
+        # parent process
+        self.exec_("import uos\nuos.mkdir('%s')" % dir, silent_fail=True)
 
     def fs_rmdir(self, dir):
         self.exec_("import uos\nuos.rmdir('%s')" % dir)
