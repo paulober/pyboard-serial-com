@@ -1,16 +1,13 @@
-import { PyboardRunner, SCAN_DEVICE } from "../pyboardRunner"
+import { PyboardRunner } from "../pyboardRunner"
 import { PyOutType } from "../pyout"
 import type {
   PyOut,
   PyOutListContents,
-  PyOutCommandResult,
-  PyOutCommandWithResponse,
   PyOutFsOps,
-  PyOutPortsScan,
 } from "../pyout"
 
 const pyboardRunner = new PyboardRunner(
-  SCAN_DEVICE,
+  "COM3",
   (data: Buffer | undefined) => {
     if (data !== undefined) {
       console.log(`stderr: ${data?.toString()}`)
@@ -31,38 +28,11 @@ const pyboardRunner = new PyboardRunner(
   "python"
 )
 
-//console.log(`Waiting for process to start: ${pyboardRunner.isConnected()}`)
-//pyboardRunner.stop()
-//while (pyboardRunner.proc.connected) {}
+
 setTimeout(async () => {
-  //console.log(pyboardRunner.executeCommand("print('Hello World')"))
-  //console.log(pyboardRunner.listContents("/"))
-  /*console.log(
-        pyboardRunner.downloadFiles(
-            [":project.pico-w-go", ":list_avail_modules.py"], 
-            "C:\\Users\\paulo\\Downloads\\"))*/
-  /*pyboardRunner.uploadFiles(
-        ["C:\\Users\\paulo\\Downloads\\tesf.txt",
-        "C:\\Users\\paulo\\Downloads\\anders.py"],
-        ":")*/
+  console.log("===== Adding all operations!")
 
-  //pyboardRunner.deleteFiles(["tesf.txt", "anders.py"])
-
-  //pyboardRunner.createFolders(["test", "test2"])
-  //pyboardRunner.listContents("/")
-  //pyboardRunner.deleteFolders(["test", "test2"])
-  //pyboardRunner.listContents("/")
-
-  /* Works!!
-    pyboardRunner.createFolders(["test"])
-    pyboardRunner.listContents("/")
-    pyboardRunner.listContents("/test")
-    pyboardRunner.uploadFiles(["C:\\Users\\paulo\\Downloads\\test.txt"], ":test/")
-    pyboardRunner.listContents("/test")
-    pyboardRunner.deleteFolderRecursive("/test")
-    pyboardRunner.listContents("/")*/
-
-  //pyboardRunner.listContents("/")
+  pyboardRunner.listContents("/").then(listDataCp)
 
   console.log("===== Finished adding all operations!")
 }, 700)
@@ -80,15 +50,6 @@ async function listDataCp(data: PyOut): Promise<void> {
   }
 }
 
-async function friendlyCommandCb(data: string): Promise<void> {
-  // vscode debugging console doesn't show stdout, so we need to use console.log
-  if (process.env.v8debug !== undefined) {
-    console.log(data)
-  } else {
-    process.stdout.write(data)
-  }
-}
-
 process.on("SIGINT", () => {
   console.log("Caught interrupt signal")
   pyboardRunner.disconnect()
@@ -100,61 +61,8 @@ process.on("SIGINT", () => {
     await new Promise((resolve) => setTimeout(resolve, 1000))
     i--
   }
-  pyboardRunner.switchDevice("COM3")
+  pyboardRunner.switchDevice("COM4")
   setTimeout(async () => {
-    /*pyboardRunner.listContents("/").then(listDataCp)
-    pyboardRunner.createFolders(["test9", "atest9"]).then((data: PyOut) => {
-      if (data.type === PyOutType.fsOps) {
-        const result = data as PyOutFsOps
-        console.log(`Create folder status: ${result.status}`)
-      }
-    })
-    pyboardRunner.listContents("/").then(listDataCp)
-    pyboardRunner.deleteFolders(["test9", "atest9"]).then((data: PyOut) => {
-      if (data.type === PyOutType.fsOps) {
-        const result = data as PyOutFsOps
-        console.log(`Delete folder status: ${result.status}`)
-      }
-    })
-    pyboardRunner.listContents("/").then(listDataCp)
-    /*pyboardRunner.startUploadingProject(
-      "N:\\pyboard-serial-com\\scripts\\test",
-      [".py"],
-      []
-    )*/ /*
-    pyboardRunner
-      .executeFriendlyCommand("print('Hello World')", friendlyCommandCb)
-      .then((data: PyOut) => {
-        if (data.type === PyOutType.commandResult) {
-          const result = data as PyOutCommandResult
-          console.log(`Friendly Command result: ${result.result}`)
-        }
-      })
-    pyboardRunner
-      .executeFriendlyCommand("a=2", friendlyCommandCb)
-      .then((data: PyOut) => {
-        if (data.type === PyOutType.commandResult) {
-          const result = data as PyOutCommandResult
-          console.log(`Friendly Command result: ${result.result}`)
-        }
-      })
-    pyboardRunner
-      .executeFriendlyCommand("a", friendlyCommandCb)
-      .then((data: PyOut) => {
-        if (data.type === PyOutType.commandResult) {
-          const result = data as PyOutCommandResult
-          console.log(`Friendly Command result: ${result.result}`)
-        }
-      })
-    pyboardRunner
-      .executeFriendlyCommand("while a < 8: print(a); a+=1", friendlyCommandCb)
-      .then((data: PyOut) => {
-        if (data.type === PyOutType.commandResult) {
-          const result = data as PyOutCommandResult
-          console.log(`Friendly Command result: ${result.result}`)
-        }
-      })*/
-
     pyboardRunner.deleteFolderRecursive("/").then((data: PyOut) => {
       if (data.type === PyOutType.fsOps) {
         const result = data as PyOutFsOps
