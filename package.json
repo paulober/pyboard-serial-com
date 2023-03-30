@@ -1,6 +1,6 @@
 {
   "name": "@paulober/pyboard-serial-com",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A simple library to communicate with the pyboard.py tool over serialport.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -25,7 +25,7 @@
     "test": "npm run compile-tests && node ./dist/tests/index.js"
   },
   "devDependencies": {
-    "@types/node": "^16.14.2",
+    "@types/node": "^16.x",
     "@types/uuid": "^9.0.1",
     "@typescript-eslint/eslint-plugin": "^5.55.0",
     "@typescript-eslint/parser": "^5.55.0",
