@@ -4,6 +4,7 @@ import type {
   PyOut,
   PyOutListContents,
   PyOutFsOps,
+  PyOutCommandResult,
 } from "../pyout"
 
 const pyboardRunner = new PyboardRunner(
@@ -27,7 +28,6 @@ const pyboardRunner = new PyboardRunner(
   },
   "python"
 )
-
 
 setTimeout(async () => {
   console.log("===== Adding all operations!")
@@ -56,14 +56,14 @@ process.on("SIGINT", () => {
   process.exit()
 })
 ;(async function () {
-  let i = 10
+  let i = 2
   while (i > 0) {
     await new Promise((resolve) => setTimeout(resolve, 1000))
     i--
   }
-  pyboardRunner.switchDevice("COM4")
+  pyboardRunner.switchDevice("COM3")
   setTimeout(async () => {
-    pyboardRunner.deleteFolderRecursive("/").then((data: PyOut) => {
+    /*pyboardRunner.deleteFolderRecursive("/").then((data: PyOut) => {
       if (data.type === PyOutType.fsOps) {
         const result = data as PyOutFsOps
         console.log(`Delete folder status: ${result.status}`)
@@ -108,8 +108,27 @@ process.on("SIGINT", () => {
         const result = data as PyOutFsOps
         console.log(`Download project status: ${result.status}`)
       }
+    })*/
+    process.stdin.on("data", async (data: Buffer) => {
+      await pyboardRunner.writeToPyboard(data.toString("utf-8"))
     })
-  }, 700)
+    //"a='asd'\na\n",
+    //"a=0\nwhile a < 2:\n    b=input('Inp: ')\n    b\n    a+=1",
+    pyboardRunner
+      .executeFriendlyCommand(
+        "input('Inp: '); print('asd')",
+        (data: string) => {
+          // does work in vscode only with launch config edit
+          process.stdout.write(data)
+        }
+      )
+      .then((data: PyOut) => {
+        if (data.type === PyOutType.commandResult) {
+          const result = data as PyOutCommandResult
+          console.log(`Command result: ${result.result}`)
+        }
+      })
+  }, 300)
 })()
 ;(async function () {
   while (true) {

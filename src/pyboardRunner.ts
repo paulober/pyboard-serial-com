@@ -39,7 +39,7 @@ enum OperationType {
 type Command = {
   command:
     | "command"
-    | "friendly_command"
+    | "friendly_code"
     | "double_ctrlc"
     | "list_contents"
     | "list_contents_recursive"
@@ -53,6 +53,7 @@ type Command = {
     | "exit"
   args: {
     command?: string
+    code?: string
     // if count is 1, the local or remote path can be used as target file (and folder)
     files?: string[]
     folders?: string[]
@@ -63,6 +64,11 @@ type Command = {
     local_base_dir?: string
     verbose?: boolean
   }
+}
+
+type ProgressData = {
+  written: number
+  total: number
 }
 
 enum PyboardRunnerEvents {
@@ -82,7 +88,7 @@ export class PyboardRunner extends EventEmitter {
   private idCounter = 1
 
   private device: string
-  private static readonly WRAPPER_PY_PATH: string = path.join(
+  private static readonly wrapperPyPath: string = path.join(
     __dirname,
     "..",
     "scripts",
@@ -137,7 +143,7 @@ export class PyboardRunner extends EventEmitter {
 
     this.proc = spawn(
       this.pythonExe,
-      [PyboardRunner.WRAPPER_PY_PATH, "-d", this.device, "-b", "115200"],
+      [PyboardRunner.wrapperPyPath, "-d", this.device, "-b", "115200"],
       {
         stdio: "pipe",
         windowsHide: true,
@@ -146,7 +152,7 @@ export class PyboardRunner extends EventEmitter {
     )
 
     // Set the encoding for the subprocess stdin.
-    this.proc.stdin.setDefaultEncoding('utf-8')
+    this.proc.stdin.setDefaultEncoding("utf-8")
 
     this.proc.on("spawn", () => {
       this.pipeConnected = true
@@ -181,7 +187,7 @@ export class PyboardRunner extends EventEmitter {
 
     const proc = spawn(
       pythonExe,
-      [PyboardRunner.WRAPPER_PY_PATH, "--scan-ports"],
+      [PyboardRunner.wrapperPyPath, "--scan-ports"],
       {
         stdio: "pipe",
         windowsHide: true,
@@ -218,7 +224,7 @@ export class PyboardRunner extends EventEmitter {
   private spawnNewProcess(): void {
     this.proc = spawn(
       this.pythonExe,
-      [PyboardRunner.WRAPPER_PY_PATH, "-d", this.device, "-b", "115200"],
+      [PyboardRunner.wrapperPyPath, "-d", this.device, "-b", "115200"],
       {
         stdio: "pipe",
         windowsHide: true,
@@ -227,7 +233,7 @@ export class PyboardRunner extends EventEmitter {
     )
 
     // Set the encoding for the subprocess stdin.
-    this.proc.stdin.setDefaultEncoding('utf-8')
+    this.proc.stdin.setDefaultEncoding("utf-8")
 
     this.proc.on("spawn", () => {
       this.pipeConnected = true
@@ -368,7 +374,10 @@ export class PyboardRunner extends EventEmitter {
             // in a readable format
             //const f = this.outBuffer.toString("utf-8")
 
-            if (data.includes("\n")) {
+            if (
+              data.includes("\n") ||
+              this.operationOngoing === OperationType.friendlyCommand
+            ) {
               let opResult: PyOut = { type: PyOutType.none } as PyOut
 
               //console.debug(`stdout: ${this.outBuffer.toString('utf-8')}`)
@@ -378,6 +387,20 @@ export class PyboardRunner extends EventEmitter {
 
                 case OperationType.command:
                 case OperationType.friendlyCommand:
+                  // workaround because stdin.readline in wrapper.py is not terminatable
+                  // and wrapper.py cannot write in its own stdin __SENTINEL__ requests
+                  // us to do this
+                  if (data.includes("!!__SENTINEL__!!")) {
+                    // cause stdin.readline trigger and exit to EOO
+                    this.proc.stdin.write("\n")
+
+                    // remove sentinel from buffer as it could contain more
+                    this.outBuffer = this.outBuffer.slice(
+                      0,
+                      -"!!__SENTINEL__!!".length
+                    )
+                  }
+
                   if (data.includes(EOO)) {
                     // stop operation - trigger resolve at end of scope
                     this.operationOngoing = OperationType.none
@@ -407,7 +430,8 @@ export class PyboardRunner extends EventEmitter {
                         response: this.outBuffer.toString("utf-8"),
                       } as PyOutCommandWithResponse
                     }
-                  } else {
+                  }
+                  else {
                     // either keep in buffer or write into cb and clean buffer
                     if (follow) {
                       follow(this.outBuffer.toString("utf-8"))
@@ -432,7 +456,7 @@ export class PyboardRunner extends EventEmitter {
                       // (not needed because of parts.length check)
                       .slice(0, -EOO.length)
                       .toString("utf-8")
-                      .replace("\r", "")
+                      .replaceAll("\r", "")
                       .split("\n")) {
                       const parts: string[] = line.trimStart().split(" ")
 
@@ -629,6 +653,16 @@ export class PyboardRunner extends EventEmitter {
     })
   }
 
+  public async writeToPyboard(data: string): Promise<void> {
+    if (
+      !this.proc.stdin &&
+      this.operationOngoing !== OperationType.friendlyCommand
+    ) {
+      return
+    }
+    this.proc.stdin.write(data)
+  }
+
   private async addOperation(id: number): Promise<void> {
     this.operationQueue.push(id)
 
@@ -681,6 +715,14 @@ export class PyboardRunner extends EventEmitter {
     )
   }
 
+  /**
+   * Executes a command on the remote host and follows the output
+   * Caller can interact thought this.s
+   *
+   * @param command
+   * @param follow
+   * @returns
+   */
   public async executeFriendlyCommand(
     command: string,
     follow: (data: string) => void
@@ -693,9 +735,9 @@ export class PyboardRunner extends EventEmitter {
     // be respected by stdout listener
     return this.runCommand(
       {
-        command: "friendly_command",
+        command: "friendly_code",
         args: {
-          command: command,
+          code: command,
         },
       },
       OperationType.friendlyCommand,

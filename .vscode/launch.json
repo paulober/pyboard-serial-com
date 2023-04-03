@@ -18,7 +18,9 @@
             ],
             "env": {
                 "v8debug": "true"
-            }
+            },
+            "console": "internalConsole", 
+            "outputCapture": "std",
         }
     ]
 }

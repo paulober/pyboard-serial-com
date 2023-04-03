@@ -5,10 +5,11 @@ import json
 import pyboard as pyboard
 import mpyFunctions
 import ast
-from utils import create_folder_structure
+from utils import create_folder_structure, wrap_expressions_with_print
 import threading
 import time
 import signal
+import platform
 
 EOO = "!!EOO!!"  # End of operation
 ERR = "!!ERR!!"  # Error
@@ -25,12 +26,13 @@ except ImportError:
     print("Please install pyserial")
     sys.exit(1)
 
-
 ##################################
 ######### BEGIN Utils ############
 ##################################
 
 # ensure to reflect changes also to sanitize_remote_v2
+
+
 def sanitize_remote(file: str | None) -> str:
     """Sanitizes the remote path to be used with pyboard.filesystem_command.
 
@@ -82,20 +84,38 @@ def get_directories_to_create(file_paths):
 def fs_progress_callback(written: int, total: int):
     print(f"{{\"written\": {written}, \"total\": {total}}}", flush=True)
 
-def read_vt_sequence():
-    sequence = bytearray()
-    ch = os.read(sys.stdin.fileno(), 1)
-    sequence.extend(ch)
-    
-    if ch == b'\x1b':
-        ch = os.read(sys.stdin.fileno(), 1)
-        if ch == b'[':  # CSI (Control Sequence Introducer)
-            sequence.extend(ch)
-            while not ch.decode('utf-8').isalnum():  # Continue until an alphanumeric character is read
-                ch = os.read(sys.stdin.fileno(), 1)
-                sequence.extend(ch)
-    
-    return bytes(sequence)
+
+if platform.system() == "Windows":
+    import msvcrt
+
+    def clear_stdin():
+        while msvcrt.kbhit():
+            msvcrt.getch()
+else:
+    import select
+
+    def clear_stdin():
+        stdin_fd = sys.stdin.fileno()
+        while select.select([stdin_fd], [], [], 0.0)[0]:
+            os.read(stdin_fd, 4096)
+
+def listen_stdin(stop_event: threading.Event):
+    while not stop_event.is_set():
+        # readline is aceptable MicroPython does not
+        # support listening for single chars
+        data = sys.stdin.buffer.readline()
+
+        # speed up return after __SENTINEL__ was sent
+        if stop_event.is_set(): return None
+
+        if data:
+            data = data.strip()
+            if data != "":
+                return data+b"\r"
+
+        # reduce cpu load cause by stdin polling in this runtime thread
+        time.sleep(0.01)
+    return b''
 ##################################
 ########## END Utils #############
 ##################################
@@ -347,6 +367,28 @@ def hash_file(file):
 
             print(ERR, flush=True)
 
+    def exec_friendly_cmd(self, cmd: str):
+        """Executes a command on the pyboard.
+
+        Args:
+            cmd (str): The command to execute.
+        """
+        stop_event = threading.Event()
+        stdio_thread = threading.Thread(target=redirect_stdin, args=(stop_event, self,))
+        # Set as a daemon thread to exit when the main program exits
+        stdio_thread.daemon = True
+        buf = wrap_expressions_with_print(cmd).encode("utf-8")
+        stdio_thread.start()
+
+        self.pyb.exec_raw(buf, timeout=None, data_consumer=pyboard.stdout_write_bytes)
+
+        # stop the thread
+        stop_event.set()
+        # workarount to make stdin.readline return and check for stop_event
+        sys.stdout.write("!!__SENTINEL__!!")
+        sys.stdout.flush()
+        stdio_thread.join()
+
     def stop_running_stuff(self):
         # ctrl-C twice: interrupt any running program
         self.pyb.serial.write(b"\r\x03\x03")
@@ -373,6 +415,24 @@ def read_serial_port(stop_event: threading.Event):
                 else:
                     sys.stdout.write((b"[%02x]" % ord(c)).decode("utf-8"))
                     sys.stdout.flush()
+
+        # Add a small delay to reduce CPU usage
+        time.sleep(0.01)
+
+
+def redirect_stdin(stop_event: threading.Event, wrapper: Wrapper):
+    while not stop_event.is_set():
+        c = listen_stdin(stop_event)
+
+        if stop_event.is_set():
+            break
+
+        if c == b"\x1d":  # ctrl-], quit
+            pass
+        elif c == "\x04": # ctrl-D, end of file
+            pass
+        elif c: # Only write to the serial port if there is data available
+            wrapper.pyb.serial.write(c)
 
         # Add a small delay to reduce CPU usage
         time.sleep(0.01)
@@ -445,7 +505,8 @@ if __name__ == "__main__":
                 # Set up an event object to signal the thread to stop
                 stop_event = threading.Event()
                 # Set up the thread to read the serial port
-                serial_thread = threading.Thread(target=read_serial_port, args=(stop_event,))
+                serial_thread = threading.Thread(
+                    target=read_serial_port, args=(stop_event,))
                 # Set as a daemon thread to exit when the main program exits
                 serial_thread.daemon = True
 
@@ -455,10 +516,10 @@ if __name__ == "__main__":
                 serial_thread.start()
 
                 while True:
-                    c = read_vt_sequence()
+                    c = listen_stdin(None)
                     if c == b"\x1d":  # ctrl-], quit
                         break
-                    elif c == "\x04": # ctrl-D, end of file
+                    elif c == "\x04":  # ctrl-D, end of file
                         pass
                     else:
                         wrapper.pyb.serial.write(c)
@@ -472,9 +533,9 @@ if __name__ == "__main__":
 
                 # reset friendly flag
                 wrapper.friendly = False
-                
+
                 # stop running stuff if user started something and
-                # then exited friendly mode by ctrl-] with it sent to 
+                # then exited friendly mode by ctrl-] with it sent to
                 # the board could cause problems
                 wrapper.stop_running_stuff()
 
@@ -514,11 +575,16 @@ if __name__ == "__main__":
                 print("OK", flush=True)
 
             elif line["command"] == "soft_reset":
-                wrapper.soft_reset()
+                pass
 
             elif line["command"] == "command" and "command" in line["args"]:
                 # [5:] to remove the ".cmd " from the start of the string
                 wrapper.exec_cmd(line["args"]["command"])
+
+            elif line["command"] == "friendly_code" and "code" in line["args"]:
+                wrapper.exec_friendly_cmd(line["args"]["code"])
+                # clear full stdin buffer
+                clear_stdin()
 
             elif line["command"] == "double_ctrlc":
                 wrapper.stop_running_stuff()

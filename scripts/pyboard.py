@@ -72,6 +72,9 @@ import os
 import struct
 import sys
 import time
+# EDITED by paulober
+import errno
+# END edit
 
 from collections import namedtuple
 
