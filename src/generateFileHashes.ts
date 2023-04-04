@@ -19,7 +19,8 @@ export function scanFolder(options: ScanOptions): Map<string, string> {
     for (const item of items) {
       const itemPath = join(dir, item)
 
-      if (ignoredItems.includes(itemPath)) {
+      // Ignore items are file/folder names (not absolute or relative paths)
+      if (ignoredItems.includes(item)) {
         continue
       }
 
