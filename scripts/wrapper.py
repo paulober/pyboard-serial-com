@@ -344,15 +344,15 @@ def hash_file(file):
         self.exec_cmd(f"get_file_info('{item}')")
         self.exec_cmd("del get_file_info")
 
-    def exec_cmd(self, cmd: str, follow: bool = None):
+    def exec_cmd(self, cmd: str | bytes, follow: bool = None):
         """Executes a command on the pyboard.
 
         Args:
             cmd (str): The command to execute.
         """
-        buf = cmd.encode("utf-8")
+        buf: bytes = cmd.encode("utf-8") if isinstance(cmd, str) else cmd
         if follow is None or follow:
-            ret, ret_err = self.pyb.exec_raw(
+            _, ret_err = self.pyb.exec_raw(
                 buf, timeout=None, data_consumer=pyboard.stdout_write_bytes
             )
         else:
@@ -388,6 +388,23 @@ def hash_file(file):
         sys.stdout.write("!!__SENTINEL__!!")
         sys.stdout.flush()
         stdio_thread.join()
+
+    def run_file(self, filename: str):
+        """Runs a file on the pyboard.
+
+        Args:
+            file (str): The path to the file to run on the remote host.
+        """
+        try:
+            with open(filename, "rb") as f:
+                pyfile = f.read()
+                if filename.endswith(".mpy") and pyfile[0] == ord("M"):
+                    self.pyb.exec_("_injected_buf=" + repr(pyfile))
+                    pyfile = pyboard._injected_import_hook_code
+                self.exec_cmd(pyfile)
+
+        except:
+            print(ERR, flush=True)
 
     def stop_running_stuff(self):
         # ctrl-C twice: interrupt any running program
@@ -585,6 +602,9 @@ if __name__ == "__main__":
                 wrapper.exec_friendly_cmd(line["args"]["code"])
                 # clear full stdin buffer
                 clear_stdin()
+
+            elif line["command"] == "run_file" and "files" in line["args"]:
+                wrapper.run_file(line["args"]["files"][0])
 
             elif line["command"] == "double_ctrlc":
                 wrapper.stop_running_stuff()

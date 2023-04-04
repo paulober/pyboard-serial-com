@@ -1,11 +1,6 @@
 import { PyboardRunner } from "../pyboardRunner"
 import { PyOutType } from "../pyout"
-import type {
-  PyOut,
-  PyOutListContents,
-  PyOutFsOps,
-  PyOutCommandResult,
-} from "../pyout"
+import type { PyOut, PyOutListContents, PyOutCommandResult } from "../pyout"
 
 const pyboardRunner = new PyboardRunner(
   "COM3",
@@ -109,7 +104,9 @@ process.on("SIGINT", () => {
         console.log(`Download project status: ${result.status}`)
       }
     })*/
-    process.stdin.on("data", async (data: Buffer) => {
+
+    // Friendly command test
+    /*process.stdin.on("data", async (data: Buffer) => {
       await pyboardRunner.writeToPyboard(data.toString("utf-8"))
     })
     //"a='asd'\na\n",
@@ -126,6 +123,21 @@ process.on("SIGINT", () => {
         if (data.type === PyOutType.commandResult) {
           const result = data as PyOutCommandResult
           console.log(`Command result: ${result.result}`)
+        }
+      })*/
+
+    pyboardRunner
+      .runFile(
+        "N:\\pyboard-serial-com\\scripts\\test\\im_test.py",
+        (data: string) => {
+          // does work in vscode only with launch config edit
+          process.stdout.write(data)
+        }
+      )
+      .then((data: PyOut) => {
+        if (data.type === PyOutType.commandResult) {
+          const result = data as PyOutCommandResult
+          console.log(`File run result: ${result.result}`)
         }
       })
   }, 300)

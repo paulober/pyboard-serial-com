@@ -14,6 +14,7 @@ import type { ScanOptions } from "./generateFileHashes"
 import { scanFolder } from "./generateFileHashes"
 import { EventEmitter } from "events"
 import { EOL } from "os"
+import { existsSync } from "fs"
 
 const EOO: string = "!!EOO!!"
 // This string is also hardcoded into pyboard.py at various places
@@ -24,6 +25,7 @@ enum OperationType {
   scanPorts,
   command,
   friendlyCommand,
+  runFile,
   listContents,
 
   // fsOps
@@ -40,6 +42,7 @@ type Command = {
   command:
     | "command"
     | "friendly_code"
+    | "run_file"
     | "double_ctrlc"
     | "list_contents"
     | "list_contents_recursive"
@@ -64,11 +67,6 @@ type Command = {
     local_base_dir?: string
     verbose?: boolean
   }
-}
-
-type ProgressData = {
-  written: number
-  total: number
 }
 
 enum PyboardRunnerEvents {
@@ -387,6 +385,7 @@ export class PyboardRunner extends EventEmitter {
 
                 case OperationType.command:
                 case OperationType.friendlyCommand:
+                case OperationType.runFile:
                   // workaround because stdin.readline in wrapper.py is not terminatable
                   // and wrapper.py cannot write in its own stdin __SENTINEL__ requests
                   // us to do this
@@ -430,8 +429,7 @@ export class PyboardRunner extends EventEmitter {
                         response: this.outBuffer.toString("utf-8"),
                       } as PyOutCommandWithResponse
                     }
-                  }
-                  else {
+                  } else {
                     // either keep in buffer or write into cb and clean buffer
                     if (follow) {
                       follow(this.outBuffer.toString("utf-8"))
@@ -1000,6 +998,14 @@ export class PyboardRunner extends EventEmitter {
     )
   }
 
+  /**
+   * Upload a files not present or outdated on the remote host
+   *
+   * PyboardRunner.remoteFileHashes and PyboardRunner.localFileHashes must be set!
+   *
+   * @param follow If set, the follow callback will be called with the output of the operation
+   * @returns
+   */
   private async uploadProject(follow?: (data: string) => void): Promise<PyOut> {
     const filesToUpload = [...this.localFileHashes.keys()]
       .filter(
@@ -1039,6 +1045,32 @@ export class PyboardRunner extends EventEmitter {
     //await createFolderStructure(filePaths, projectRoot)
 
     return this.downloadFiles(filePaths, projectRoot, follow)
+  }
+
+  /**
+   * Executes a local file on the remote host
+   *
+   * @param file The file to execute (absolue path)
+   * @returns PyOut
+   */
+  public async runFile(
+    file: string,
+    follow: (data: string) => void
+  ): Promise<PyOut> {
+    if (!this.pipeConnected || !existsSync(file)) {
+      return { type: PyOutType.none }
+    }
+
+    return this.runCommand(
+      {
+        command: "run_file",
+        args: {
+          files: [file],
+        },
+      },
+      OperationType.runFile,
+      follow
+    )
   }
 
   /**
