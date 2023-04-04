@@ -1,6 +1,11 @@
 import { PyboardRunner } from "../pyboardRunner"
 import { PyOutType } from "../pyout"
-import type { PyOut, PyOutListContents, PyOutCommandResult } from "../pyout"
+import type {
+  PyOut,
+  PyOutListContents,
+  PyOutCommandResult,
+  PyOutCommandWithResponse,
+} from "../pyout"
 
 const pyboardRunner = new PyboardRunner(
   "COM3",
@@ -140,6 +145,25 @@ process.on("SIGINT", () => {
           console.log(`File run result: ${result.result}`)
         }
       })
+
+    pyboardRunner.softReset(true).then((data: PyOut) => {
+      if (data.type === PyOutType.commandWithResponse) {
+        const result = data as PyOutCommandWithResponse
+        console.log(`Soft reset response: \n${result.response}`)
+      } else if (data.type === PyOutType.commandResult) {
+        const result = data as PyOutCommandResult
+        console.log(`Soft reset result: ${result.result}`)
+      }
+    })
+
+    pyboardRunner.hardReset().then((data: PyOut) => {
+      if (data.type === PyOutType.commandResult) {
+        const result = data as PyOutCommandResult
+        console.log(`Hard reset result: ${result.result}`)
+      }
+    })
+
+    pyboardRunner.listContents("/").then(listDataCp)
   }, 300)
 })()
 ;(async function () {

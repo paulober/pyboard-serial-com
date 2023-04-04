@@ -36,6 +36,9 @@ enum OperationType {
   deleteFolders,
   deleteFolderRecursive,
   calcHashes,
+
+  // other
+  reset,
 }
 
 type Command = {
@@ -54,6 +57,8 @@ type Command = {
     | "rmtree"
     | "calc_file_hashes"
     | "exit"
+    | "soft_reset"
+    | "hard_reset"
   args: {
     command?: string
     code?: string
@@ -102,6 +107,7 @@ export class PyboardRunner extends EventEmitter {
   private localFileHashes: Map<string, string> = new Map()
   private projectRoot: string = ""
   private remoteFileHashes: Map<string, string> = new Map()
+  private hardResetResolve?: (data: PyOut) => void
 
   /**
    * Auto-connects to the serial port provided.
@@ -293,7 +299,20 @@ export class PyboardRunner extends EventEmitter {
 
   private onExit(code: number, signal: string): void {
     this.pipeConnected = false
-    this.exit(code, signal)
+    if (this.operationOngoing !== OperationType.reset) {
+      this.exit(code, signal)
+    } else {
+      this.spawnNewProcess()
+      if (this.hardResetResolve) {
+        this.operationOngoing = OperationType.none
+        this.hardResetResolve({
+          type: PyOutType.commandResult,
+          result: true,
+        } as PyOutCommandResult)
+        this.hardResetResolve = undefined
+        this.processNextOperation()
+      }
+    }
   }
 
   private onClose(): void {
@@ -339,6 +358,11 @@ export class PyboardRunner extends EventEmitter {
 
         // set operation type so that the stdout handler knows what to do
         this.operationOngoing = operationType
+
+        if (command.command === "hard_reset") {
+          // save for delayed resolve
+          this.hardResetResolve = resolve
+        }
 
         // start operation
         let errOccured = false
@@ -591,6 +615,33 @@ export class PyboardRunner extends EventEmitter {
                     break
                   }
 
+                  return
+
+                case OperationType.reset:
+                  if (data.includes(EOO)) {
+                    // stop operation
+                    this.operationOngoing = OperationType.none
+
+                    if (command.args.verbose) {
+                      opResult = {
+                        type: PyOutType.commandWithResponse,
+                        response: this.outBuffer
+                          .toString("utf-8")
+                          .trimEnd()
+                          .slice(0, -EOO.length),
+                      } as PyOutCommandWithResponse
+                    } else {
+                      opResult = {
+                        type: PyOutType.commandResult,
+                        result: this.outBuffer.includes(ERR),
+                      } as PyOutCommandResult
+                    }
+
+                    // jump to buffer clean-up and resolve as operation is now finished
+                    break
+                  }
+
+                  // avoid clearing of buffer as operation is not finished
                   return
 
                 default:
@@ -1070,6 +1121,50 @@ export class PyboardRunner extends EventEmitter {
       },
       OperationType.runFile,
       follow
+    )
+  }
+
+  /**
+   * Performs a soft reset on the Pico
+   *
+   * @param verbose Currently not supported
+   * @returns PyOut of type none or
+   * PyOutCommandResult (verbose=false) or PyOutCommandWithResponse (verbose=true)
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  public async softReset(verbose: boolean = false): Promise<PyOut> {
+    if (!this.pipeConnected) {
+      return { type: PyOutType.none }
+    }
+
+    return this.runCommand(
+      {
+        command: "soft_reset",
+        args: { },
+      },
+      OperationType.reset
+    )
+  }
+
+  /**
+   * Performs a hard reset on the Pico
+   *
+   * @param verbose Currently not supported
+   * @returns PyOut of type none or
+   * PyOutCommandResult (verbose=false) or PyOutCommandWithResponse (verbose=true)
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  public async hardReset(verbose: boolean = false): Promise<PyOut> {
+    if (!this.pipeConnected) {
+      return { type: PyOutType.none }
+    }
+
+    return this.runCommand(
+      {
+        command: "hard_reset",
+        args: {},
+      },
+      OperationType.reset
     )
   }
 

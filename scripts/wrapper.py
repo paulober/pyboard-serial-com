@@ -89,6 +89,7 @@ if platform.system() == "Windows":
     import msvcrt
 
     def clear_stdin():
+        # does only work in cmd or ps1 like environments
         while msvcrt.kbhit():
             msvcrt.getch()
 else:
@@ -406,6 +407,30 @@ def hash_file(file):
         except:
             print(ERR, flush=True)
 
+    def reboot(self, verbose: bool = False):
+        """
+        Reboots the pyboard.
+        """
+        self.stop_running_stuff()
+        cmd = "\rimport machine; machine.reset()"
+        # verbose does not work
+        if verbose:
+            self.pyb.exec(cmd, data_consumer=pyboard.stdout_write_bytes, silent_fail=True)
+        else:
+            self.pyb.exec(cmd, silent_fail=True)
+        # unreachable code
+        #time.sleep(1.0)
+        #self.pyb.enter_raw_repl(False)
+
+    def soft_reset(self):
+        """
+        Soft resets the pyboard.
+        """
+        self.stop_running_stuff()
+        self.pyb.exit_raw_repl()
+        self.pyb.enter_raw_repl(True)
+        time.sleep(0.1)
+
     def stop_running_stuff(self):
         # ctrl-C twice: interrupt any running program
         self.pyb.serial.write(b"\r\x03\x03")
@@ -592,7 +617,10 @@ if __name__ == "__main__":
                 print("OK", flush=True)
 
             elif line["command"] == "soft_reset":
-                pass
+                wrapper.soft_reset()
+
+            elif line["command"] == "hard_reset":
+                wrapper.reboot()
 
             elif line["command"] == "command" and "command" in line["args"]:
                 # [5:] to remove the ".cmd " from the start of the string
