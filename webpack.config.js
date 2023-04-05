@@ -20,7 +20,7 @@ const extensionConfig = {
     libraryTarget: 'commonjs2'
   },
   node: {
-    __filename: true,
+    __filename: false,
   },
   externals: { },
   resolve: {
