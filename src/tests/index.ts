@@ -32,7 +32,8 @@ const pyboardRunner = new PyboardRunner(
 setTimeout(async () => {
   console.log("===== Adding all operations!")
 
-  pyboardRunner.listContents("/").then(listDataCp)
+  //pyboardRunner.listContents("/").then(listDataCp)
+  await PyboardRunner.getPorts()
 
   console.log("===== Finished adding all operations!")
 }, 700)

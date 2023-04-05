@@ -39,7 +39,8 @@
         "out",
         "dist",
         "tools",
-        "**/*.d.ts"
+        "**/*.d.ts",
+        "webpack.config.js"
     ],
     "env": {
         "node": true,
