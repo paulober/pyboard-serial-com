@@ -19,9 +19,6 @@ const extensionConfig = {
     filename: 'index.js',
     libraryTarget: 'commonjs2'
   },
-  node: {
-    __dirname: true
-  },
   externals: { },
   resolve: {
     // support reading TypeScript and JavaScript files, 📖 -> https://github.com/TypeStrong/ts-loader
