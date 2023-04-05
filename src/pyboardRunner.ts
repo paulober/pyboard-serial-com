@@ -207,7 +207,11 @@ export class PyboardRunner extends EventEmitter {
           proc.kill()
 
           // remove EOO from data (-4 because \n before and after EOO)
-          const dataStr = data.toString("utf-8").replace(EOO + EOL, "")
+          const dataStr = data
+            .toString("utf-8")
+            .replaceAll("\r", "")
+            .replace(EOO, "")
+            .trim()
 
           const resp: PyOutPortsScan = {
             type: PyOutType.portsScan,
@@ -467,6 +471,7 @@ export class PyboardRunner extends EventEmitter {
                   break
 
                 case OperationType.listContents:
+                  // TODO: unexpected behavior if data contains ERR and no content!
                   if (data.includes(EOO)) {
                     // stop operation
                     this.operationOngoing = OperationType.none
@@ -1140,7 +1145,7 @@ export class PyboardRunner extends EventEmitter {
     return this.runCommand(
       {
         command: "soft_reset",
-        args: { },
+        args: {},
       },
       OperationType.reset
     )
