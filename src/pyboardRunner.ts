@@ -1,6 +1,6 @@
 import type { ChildProcessWithoutNullStreams } from "child_process"
 import { spawn } from "child_process"
-import path = require("path")
+import * as path from "path"
 import type {
   PyOut,
   PyOutCommandResult,
@@ -80,11 +80,7 @@ enum PyboardRunnerEvents {
 }
 
 function getScriptsRoot(): string {
-  if (process.env.NODE_ENV === "production") {
-    return path.join(path.dirname(__filename), "..", "scripts")
-  } else {
-    return path.join(__dirname, "..", "scripts")
-  }
+  return path.join(__dirname, "..", "scripts")
 }
 
 export class PyboardRunner extends EventEmitter {

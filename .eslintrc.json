@@ -40,7 +40,8 @@
         "dist",
         "tools",
         "**/*.d.ts",
-        "webpack.config.js"
+        "webpack.config.js",
+        "rollup.config.mjs"
     ],
     "env": {
         "node": true,

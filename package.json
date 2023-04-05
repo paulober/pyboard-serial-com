@@ -1,8 +1,9 @@
 {
   "name": "@paulober/pyboard-serial-com",
-  "version": "1.3.9",
+  "version": "1.4.0",
   "description": "A simple library to communicate with the pyboard.py tool over serialport.",
-  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "type": "module",
   "types": "./dist/index.d.ts",
   "repository": {
     "type": "git",
@@ -20,20 +21,22 @@
   ],
   "minimumNodeVersion": 16,
   "scripts": {
-    "compile": "webpack --mode production",
+    "build": "rollup -c --environment BUILD:production",
     "compile-tests": "tsc --project tsconfig.tests.json",
     "test": "npm run compile-tests && node ./dist/tests/index.js"
   },
   "devDependencies": {
+    "@rollup/plugin-commonjs": "^24.0.1",
+    "@rollup/plugin-node-resolve": "^15.0.2",
+    "@rollup/plugin-terser": "^0.4.0",
+    "@rollup/plugin-typescript": "^11.1.0",
     "@types/node": "^16.x",
     "@types/uuid": "^9.0.1",
     "@typescript-eslint/eslint-plugin": "^5.57.1",
     "@typescript-eslint/parser": "^5.57.1",
     "eslint": "^8.37.0",
-    "ts-loader": "^9.4.2",
-    "typescript": "^5.0.3",
-    "webpack": "^5.77.0",
-    "webpack-cli": "^5.0.1"
+    "rollup": "^3.20.2",
+    "typescript": "^5.0.3"
   },
   "dependencies": {
     "uuid": "^9.0.0"
