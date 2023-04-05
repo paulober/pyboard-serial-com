@@ -15,7 +15,7 @@ export default {
   },
   external: [],
   plugins: [
-    copy({
+    !isProduction && copy({
       targets: [
         { src: "scripts/*.py", dest: "dist/scripts" },
       ],

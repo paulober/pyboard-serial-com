@@ -23,7 +23,7 @@
   "minimumNodeVersion": 16,
   "scripts": {
     "build": "rollup -c --environment BUILD:production",
-    "compile-tests": "tsc --project tsconfig.tests.json",
+    "compile-tests": "tsc --project tsconfig.tests.json && rollup -c ./scripts/rollup.config.copy.mjs --silent",
     "test": "npm run compile-tests && node ./dist/tests/index.js"
   },
   "devDependencies": {
