@@ -81,13 +81,7 @@ enum PyboardRunnerEvents {
 
 function getScriptsRoot(): string {
   if (process.env.NODE_ENV === "production") {
-    return path.join(
-      __dirname,
-      "node_modules",
-      "@paulober",
-      "pyboard-serial-com",
-      "scripts"
-    )
+    return path.join(path.dirname(__filename), "..", "scripts")
   } else {
     return path.join(__dirname, "..", "scripts")
   }
@@ -106,9 +100,7 @@ export class PyboardRunner extends EventEmitter {
 
   private device: string
   private static readonly wrapperPyPath: string = path.join(
-    __dirname,
-    "..",
-    "scripts",
+    getScriptsRoot(),
     "wrapper.py"
   )
   private pythonExe: string
@@ -165,7 +157,7 @@ export class PyboardRunner extends EventEmitter {
       {
         stdio: "pipe",
         windowsHide: true,
-        cwd: path.join(__dirname, "..", "scripts"),
+        cwd: getScriptsRoot(),
       }
     )
 
@@ -209,7 +201,7 @@ export class PyboardRunner extends EventEmitter {
       {
         stdio: "pipe",
         windowsHide: true,
-        cwd: path.join(__dirname, "..", "scripts"),
+        cwd: getScriptsRoot(),
       }
     )
 
@@ -250,7 +242,7 @@ export class PyboardRunner extends EventEmitter {
       {
         stdio: "pipe",
         windowsHide: true,
-        cwd: path.join(__dirname, "..", "scripts"),
+        cwd: getScriptsRoot(),
       }
     )
 
