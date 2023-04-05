@@ -92,7 +92,8 @@ export class PyboardRunner extends EventEmitter {
 
   private device: string
   private static readonly wrapperPyPath: string = path.join(
-    require.resolve("@paulober/pyboard-serial-com"),
+    __dirname,
+    "..",
     "scripts",
     "wrapper.py"
   )
@@ -150,7 +151,7 @@ export class PyboardRunner extends EventEmitter {
       {
         stdio: "pipe",
         windowsHide: true,
-        cwd: path.join(require.resolve("@paulober/pyboard-serial-com"), "scripts"),
+        cwd: path.join(__dirname, "..", "scripts"),
       }
     )
 
@@ -194,7 +195,7 @@ export class PyboardRunner extends EventEmitter {
       {
         stdio: "pipe",
         windowsHide: true,
-        cwd: path.join(require.resolve("@paulober/pyboard-serial-com"), "scripts"),
+        cwd: path.join(__dirname, "..", "scripts"),
       }
     )
 
@@ -235,7 +236,7 @@ export class PyboardRunner extends EventEmitter {
       {
         stdio: "pipe",
         windowsHide: true,
-        cwd: path.join(require.resolve("@paulober/pyboard-serial-com"), "scripts"),
+        cwd: path.join(__dirname, "..", "scripts"),
       }
     )
 
