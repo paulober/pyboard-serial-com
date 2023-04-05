@@ -14,9 +14,11 @@ Or add this package to your `package.json` file:
 
 ```json
 "dependencies": {
-    "@paulober/pyboard-serial-com": "1.4.2"
+    "@paulober/pyboard-serial-com": "1.4.3"
 }
 ```
+
+NOTE: requires the scripts directory to be present in your work-/output directory
 
 ## Usage
 

@@ -81,7 +81,7 @@ enum PyboardRunnerEvents {
 }
 
 function getScriptsRoot(): string {
-  return join(dirname(fileURLToPath(import.meta.url)), "..", "scripts")
+  return join(dirname(fileURLToPath(import.meta.url)), "scripts")
 }
 
 export class PyboardRunner extends EventEmitter {

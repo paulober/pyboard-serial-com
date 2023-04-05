@@ -1,6 +1,6 @@
 {
   "name": "@paulober/pyboard-serial-com",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "description": "A simple library to communicate with the pyboard.py tool over serialport.",
   "module": "./dist/index.mjs",
   "type": "module",
@@ -37,6 +37,7 @@
     "@typescript-eslint/parser": "^5.57.1",
     "eslint": "^8.37.0",
     "rollup": "^3.20.2",
+    "rollup-plugin-copy": "^3.4.0",
     "typescript": "^5.0.3"
   },
   "dependencies": {
