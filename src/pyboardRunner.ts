@@ -79,6 +79,20 @@ enum PyboardRunnerEvents {
   nextOperation = "nextOperation",
 }
 
+function getScriptsRoot(): string {
+  if (process.env.NODE_ENV === "production") {
+    return path.join(
+      __dirname,
+      "node_modules",
+      "@paulober",
+      "pyboard-serial-com",
+      "scripts"
+    )
+  } else {
+    return path.join(__dirname, "..", "scripts")
+  }
+}
+
 export class PyboardRunner extends EventEmitter {
   public proc: ChildProcessWithoutNullStreams
   private pipeConnected: boolean = false
