@@ -1,20 +1,21 @@
 import type { ChildProcessWithoutNullStreams } from "child_process"
 import { spawn } from "child_process"
-import * as path from "path"
+import { dirname, join } from "path"
 import type {
   PyOut,
   PyOutCommandResult,
   PyOutCommandWithResponse,
   PyOutListContents,
   PyOutPortsScan,
-} from "./pyout"
-import { PyOutType } from "./pyout"
-import type PyFileData from "./pyfileData"
-import type { ScanOptions } from "./generateFileHashes"
-import { scanFolder } from "./generateFileHashes"
+} from "./pyout.js"
+import { PyOutType } from "./pyout.js"
+import type PyFileData from "./pyfileData.js"
+import type { ScanOptions } from "./generateFileHashes.js"
+import { scanFolder } from "./generateFileHashes.js"
 import { EventEmitter } from "events"
 import { EOL } from "os"
 import { existsSync } from "fs"
+import { fileURLToPath } from "url"
 
 const EOO: string = "!!EOO!!"
 // This string is also hardcoded into pyboard.py at various places
@@ -80,7 +81,7 @@ enum PyboardRunnerEvents {
 }
 
 function getScriptsRoot(): string {
-  return path.join(__dirname, "..", "scripts")
+  return join(dirname(fileURLToPath(import.meta.url)), "..", "scripts")
 }
 
 export class PyboardRunner extends EventEmitter {
@@ -95,7 +96,7 @@ export class PyboardRunner extends EventEmitter {
   private idCounter = 1
 
   private device: string
-  private static readonly wrapperPyPath: string = path.join(
+  private static readonly wrapperPyPath: string = join(
     getScriptsRoot(),
     "wrapper.py"
   )
@@ -145,7 +146,7 @@ export class PyboardRunner extends EventEmitter {
     this.device = device
     this.pythonExe = pythonExe
 
-    console.debug(`Connecting to ${this.device}`)
+    console.debug(`[pyboard-serial-com] Connecting to ${this.device}`)
 
     this.proc = spawn(
       this.pythonExe,
@@ -351,7 +352,7 @@ export class PyboardRunner extends EventEmitter {
       return { type: PyOutType.none } as PyOut
     }
 
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       const opId = this.idCounter++
 
       this.once(`${PyboardRunnerEvents.nextOperation}_${opId}`, async () => {
@@ -373,7 +374,7 @@ export class PyboardRunner extends EventEmitter {
         // start operation
         let errOccured = false
         //let cmd = JSON.stringify(command) // .replaceAll("\\\\", "\\")
-        this.proc.stdin.write(JSON.stringify(command) + "\n", (err) => {
+        this.proc.stdin.write(JSON.stringify(command) + "\n", err => {
           errOccured = err instanceof Error
         })
 
@@ -1045,7 +1046,7 @@ export class PyboardRunner extends EventEmitter {
       {
         command: "calc_file_hashes",
         args: {
-          files: Array.from(localHashes.keys(), (file) =>
+          files: Array.from(localHashes.keys(), file =>
             // clear out any Windows style and duble slashes
             file.replace("\\", "/").replace("//", "/")
           ),
@@ -1067,11 +1068,11 @@ export class PyboardRunner extends EventEmitter {
   private async uploadProject(follow?: (data: string) => void): Promise<PyOut> {
     const filesToUpload = [...this.localFileHashes.keys()]
       .filter(
-        (file) =>
+        file =>
           !this.remoteFileHashes.has(file) ||
           this.remoteFileHashes.get(file) !== this.localFileHashes.get(file)
       )
-      .map((file) => path.join(this.projectRoot, file), this)
+      .map(file => join(this.projectRoot, file), this)
 
     if (filesToUpload.length > 0) {
       return this.uploadFiles(filesToUpload, ":", this.projectRoot, follow)
@@ -1095,9 +1096,7 @@ export class PyboardRunner extends EventEmitter {
       return { type: PyOutType.none }
     }
 
-    const filePaths = (contents as PyOutListContents).response.map(
-      (f) => f.path
-    )
+    const filePaths = (contents as PyOutListContents).response.map(f => f.path)
 
     // redundant as downloadFiles in wrapper also does this
     //await createFolderStructure(filePaths, projectRoot)

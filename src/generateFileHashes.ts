@@ -1,6 +1,5 @@
 import { createHash } from "crypto"
 import { readdirSync, readFileSync, statSync } from "fs"
-//import { lstat, readdir, readFile } from "fs/promises"
 import { join, extname, relative } from "path"
 
 export interface ScanOptions {

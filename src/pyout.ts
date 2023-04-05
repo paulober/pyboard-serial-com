@@ -1,4 +1,4 @@
-import type PyFileData from "./pyfileData"
+import type PyFileData from "./pyfileData.js"
 
 export enum PyOutType {
     none,

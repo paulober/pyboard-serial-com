@@ -1,11 +1,11 @@
-import { PyboardRunner } from "../pyboardRunner"
-import { PyOutType } from "../pyout"
+import { PyboardRunner } from "../pyboardRunner.js"
+import { PyOutType } from "../pyout.js"
 import type {
   PyOut,
   PyOutListContents,
   PyOutCommandResult,
   PyOutCommandWithResponse,
-} from "../pyout"
+} from "../pyout.js"
 
 const pyboardRunner = new PyboardRunner(
   "COM3",

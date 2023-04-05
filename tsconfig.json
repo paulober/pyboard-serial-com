@@ -1,6 +1,6 @@
 {
 	"compilerOptions": {
-		"module": "ESNext",
+		"module": "Node16",
 		"target": "ES2021",
 		"lib": [
 			"ES2021"
@@ -10,21 +10,13 @@
 		"allowJs": false,
 		"rootDir": "src",
 		"outDir": "dist",
-		"strict": true,   /* enable all strict type-checking options */
-		/* Import aliases */
-		// baseUrl for relative imports does not work
-		//"baseUrl": "src",
-		/*"paths": {
-			"@pscLib/*": [
-				"*"
-			]
-		},*/
-
-		/* Additional Checks */
+		"strict": true,
+		"noImplicitAny": true,
 		"noImplicitReturns": true,
 		"noFallthroughCasesInSwitch": true,
 		"forceConsistentCasingInFileNames": true,
-		"esModuleInterop": false
+		"esModuleInterop": false,
+		"moduleResolution": "node16"
 	},
 	"exclude": [
 		"node_modules",

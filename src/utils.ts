@@ -1,4 +1,4 @@
-import { dirname, relative, join } from "path"
+import { dirname, join } from "path"
 import { mkdir as mkdirAsync } from "fs/promises"
 
 /**
