@@ -1,3 +1,4 @@
+import { exit } from "process"
 import { PyboardRunner } from "../pyboardRunner.js"
 import { PyOutType } from "../pyout.js"
 import type {
@@ -5,6 +6,7 @@ import type {
   PyOutListContents,
   PyOutCommandResult,
   PyOutCommandWithResponse,
+  PyOutGetItemStat,
 } from "../pyout.js"
 
 const pyboardRunner = new PyboardRunner(
@@ -29,11 +31,30 @@ const pyboardRunner = new PyboardRunner(
   "python"
 )
 
+function processStat(result: PyOut): void {
+  if (result.type === PyOutType.getItemStat) {
+    const itemStat = (result as PyOutGetItemStat).stat
+    if (itemStat === null) {
+      console.error("Item not found!")
+    } else {
+      console.log("Stat: " + JSON.stringify(itemStat))
+    }
+  }
+}
+
 setTimeout(async () => {
   console.log("===== Adding all operations!")
 
   //pyboardRunner.listContents("/").then(listDataCp)
-  await PyboardRunner.getPorts()
+  //await PyboardRunner.getPorts()
+  let result = await pyboardRunner.getItemStat("/example.py")
+  processStat(result)
+  result = await pyboardRunner.getItemStat("/test123")
+  processStat(result)
+  result = await pyboardRunner.getItemStat("/example123.py")
+  processStat(result)
+  pyboardRunner.disconnect()
+  exit(0)
 
   console.log("===== Finished adding all operations!")
 }, 700)
@@ -41,7 +62,7 @@ setTimeout(async () => {
 async function listDataCp(data: PyOut): Promise<void> {
   if (data.type === PyOutType.listContents) {
     const contents = data as PyOutListContents
-    contents.response.forEach((file) => {
+    contents.response.forEach(file => {
       console.log(
         `${file.isDir ? "Directory" : "File"}: ${file.path} (${
           file.size
@@ -59,7 +80,7 @@ process.on("SIGINT", () => {
 ;(async function () {
   let i = 2
   while (i > 0) {
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    await new Promise(resolve => setTimeout(resolve, 1000))
     i--
   }
   pyboardRunner.switchDevice("COM3")
@@ -169,6 +190,6 @@ process.on("SIGINT", () => {
 })()
 ;(async function () {
   while (true) {
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    await new Promise(resolve => setTimeout(resolve, 1000))
   }
 })()

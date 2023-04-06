@@ -1,39 +1,45 @@
 import type PyFileData from "./pyfileData.js"
 
 export enum PyOutType {
-    none,
-    portsScan,
-    commandWithResponse,
-    commandResult,
-    listContents,
-    fsOps
+  none,
+  portsScan,
+  commandWithResponse,
+  commandResult,
+  listContents,
+  fsOps,
+  getItemStat,
 }
 
 export interface PyOut {
-    type: PyOutType
+  type: PyOutType
 }
 
 export interface PyOutCommandWithResponse extends PyOut {
-    type: PyOutType.commandWithResponse
-    response: string
+  type: PyOutType.commandWithResponse
+  response: string
 }
 
 export interface PyOutCommandResult extends PyOut {
-    type: PyOutType.commandResult
-    result: boolean
+  type: PyOutType.commandResult
+  result: boolean
 }
 
 export interface PyOutListContents extends PyOut {
-    type: PyOutType.listContents
-    response: PyFileData[]
+  type: PyOutType.listContents
+  response: PyFileData[]
 }
 
 export interface PyOutFsOps extends PyOut {
-    type: PyOutType.fsOps,
-    status: boolean
+  type: PyOutType.fsOps
+  status: boolean
 }
 
 export interface PyOutPortsScan extends PyOut {
-    type: PyOutType.portsScan
-    ports: string[]
+  type: PyOutType.portsScan
+  ports: string[]
+}
+
+export interface PyOutGetItemStat extends PyOut {
+  type: PyOutType.getItemStat
+  stat: PyFileData | null
 }

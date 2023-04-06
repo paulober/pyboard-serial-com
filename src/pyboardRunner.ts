@@ -5,17 +5,20 @@ import type {
   PyOut,
   PyOutCommandResult,
   PyOutCommandWithResponse,
+  PyOutGetItemStat,
   PyOutListContents,
   PyOutPortsScan,
 } from "./pyout.js"
 import { PyOutType } from "./pyout.js"
 import type PyFileData from "./pyfileData.js"
+import type { IntermediateStats } from "./pyfileData.js"
 import type { ScanOptions } from "./generateFileHashes.js"
 import { scanFolder } from "./generateFileHashes.js"
 import { EventEmitter } from "events"
 import { EOL } from "os"
 import { existsSync } from "fs"
 import { fileURLToPath } from "url"
+import { rp2DatetimeToDate } from "./utils.js"
 
 const EOO: string = "!!EOO!!"
 // This string is also hardcoded into pyboard.py at various places
@@ -37,6 +40,7 @@ enum OperationType {
   deleteFolders,
   deleteFolderRecursive,
   calcHashes,
+  getItemStat,
 
   // other
   reset,
@@ -57,6 +61,8 @@ type Command = {
     | "rmdirs"
     | "rmtree"
     | "calc_file_hashes"
+    | "get_item_stat"
+    | "rename"
     | "exit"
     | "soft_reset"
     | "hard_reset"
@@ -67,6 +73,7 @@ type Command = {
     files?: string[]
     folders?: string[]
     target?: string
+    item?: string
     local?: string
     remote?: string
     // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -625,6 +632,55 @@ export class PyboardRunner extends EventEmitter {
 
                   return
 
+                case OperationType.getItemStat:
+                  if (data.includes(EOO)) {
+                    // stop operation
+                    this.operationOngoing = OperationType.none
+
+                    if (this.outBuffer.includes(ERR)) {
+                      opResult = {
+                        type: PyOutType.getItemStat,
+                        stat: null,
+                      } as PyOutGetItemStat
+                    } else {
+                      try {
+                        const jsonString: string = this.outBuffer
+                          .toString("utf-8")
+                          .replaceAll("\r", "")
+                          .replaceAll("\n", "")
+                          .slice(0, -EOO.length)
+
+                        const itemStat: IntermediateStats =
+                          JSON.parse(jsonString)
+
+                        opResult = {
+                          type: PyOutType.getItemStat,
+                          stat: {
+                            path: command.args.item ?? "",
+                            isDir: itemStat.is_dir,
+                            size: itemStat.size,
+                            // multiply by 1000 to get milliseconds as
+                            // timestamp is coming from python
+                            lastModified: new Date(
+                              itemStat.modification_time * 1000
+                            ),
+                            created: new Date(itemStat.creation_time * 1000),
+                          } as PyFileData,
+                        } as PyOutGetItemStat
+                      } catch (e) {
+                        console.error(e)
+                        opResult = {
+                          type: PyOutType.getItemStat,
+                          stat: null,
+                        } as PyOutGetItemStat
+                      }
+                    }
+
+                    break
+                  }
+
+                  return
+
                 case OperationType.reset:
                   if (data.includes(EOO)) {
                     // stop operation
@@ -1127,6 +1183,22 @@ export class PyboardRunner extends EventEmitter {
       },
       OperationType.runFile,
       follow
+    )
+  }
+
+  public async getItemStat(itemPath: string): Promise<PyOut> {
+    if (!this.pipeConnected) {
+      return { type: PyOutType.none }
+    }
+
+    return this.runCommand(
+      {
+        command: "get_item_stat",
+        args: {
+          item: itemPath,
+        },
+      },
+      OperationType.getItemStat
     )
   }
 
