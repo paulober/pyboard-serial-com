@@ -36,3 +36,21 @@ export interface IntermediateStats {
   size: number
   is_dir: boolean
 }
+
+/**
+ * The result of a rename operation
+ *
+ * (if success is false then error will be set)
+ */
+export interface RenameResult {
+  /**
+   * Operation result
+   */
+  success: boolean
+  /**
+   * Error message
+   * @type {string}
+   * @memberof RenameResult
+   */
+  error?: string
+}

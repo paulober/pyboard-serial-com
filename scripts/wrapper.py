@@ -100,6 +100,7 @@ else:
         while select.select([stdin_fd], [], [], 0.0)[0]:
             os.read(stdin_fd, 4096)
 
+
 def listen_stdin(stop_event: threading.Event):
     while not stop_event.is_set():
         # readline is aceptable MicroPython does not
@@ -107,7 +108,8 @@ def listen_stdin(stop_event: threading.Event):
         data = sys.stdin.buffer.readline()
 
         # speed up return after __SENTINEL__ was sent
-        if stop_event.is_set(): return None
+        if stop_event.is_set():
+            return None
 
         if data:
             data = data.strip()
@@ -326,10 +328,11 @@ def hash_file(file):
             self.exec_cmd(f"hash_file('{file}')")
 
     def rename_item(self, old: str, new: str):
-        """Renames a file / folder on the pico.
+        """Renames a file / folder on the Pico (W).
 
         Args:
-            items (list[str]): The path to the file(s) to rename on the remote host.
+            old (str): The old/current path to the file / folder.
+            new (str): The new/target path to the file / folder.
         """
         self.exec_cmd(mpyFunctions.FC_RENAME_ITEM)
         self.exec_cmd(f"rename_file('{old}', '{new}')")
@@ -345,7 +348,7 @@ def hash_file(file):
         self.exec_cmd(f"get_file_info('{item}')")
         self.exec_cmd("del get_file_info")
 
-    def exec_cmd(self, cmd: str | bytes, follow: bool = None):
+    def exec_cmd(self, cmd: str | bytes, follow: bool | None = None):
         """Executes a command on the pyboard.
 
         Args:
@@ -415,12 +418,13 @@ def hash_file(file):
         cmd = "\rimport machine; machine.reset()"
         # verbose does not work
         if verbose:
-            self.pyb.exec(cmd, data_consumer=pyboard.stdout_write_bytes, silent_fail=True)
+            self.pyb.exec(cmd, data_consumer=pyboard.stdout_write_bytes,
+                          silent_fail=True)
         else:
             self.pyb.exec(cmd, silent_fail=True)
         # unreachable code
-        #time.sleep(1.0)
-        #self.pyb.enter_raw_repl(False)
+        # time.sleep(1.0)
+        # self.pyb.enter_raw_repl(False)
 
     def soft_reset(self):
         """
@@ -471,9 +475,9 @@ def redirect_stdin(stop_event: threading.Event, wrapper: Wrapper):
 
         if c == b"\x1d":  # ctrl-], quit
             pass
-        elif c == "\x04": # ctrl-D, end of file
+        elif c == "\x04":  # ctrl-D, end of file
             pass
-        elif c: # Only write to the serial port if there is data available
+        elif c:  # Only write to the serial port if there is data available
             wrapper.pyb.serial.write(c)
 
         # Add a small delay to reduce CPU usage
@@ -707,9 +711,8 @@ if __name__ == "__main__":
             elif line["command"] == "calc_file_hashes" and "files" in line["args"]:
                 wrapper.calc_file_hashes(line["args"]["files"])
 
-            elif line["command"] == "rename" and "item" in line["args"] and "new_name" in line["args"]["item"] and "old_name" in line["args"]["item"]:
-                wrapper.rename_item(line["args"]["item"]["old_name"],
-                                    line["args"]["item"]["new_name"])
+            elif line["command"] == "rename" and "item" in line["args"] and "target" in line["args"]:
+                wrapper.rename_item(line["args"]["item"], line["args"]["target"])
 
             elif line["command"] == "get_item_stat" and "item" in line["args"]:
                 wrapper.get_item_stat(line["args"]["item"])

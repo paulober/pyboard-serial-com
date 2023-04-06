@@ -5,13 +5,14 @@ import type {
   PyOut,
   PyOutCommandResult,
   PyOutCommandWithResponse,
+  PyOutFsOps,
   PyOutGetItemStat,
   PyOutListContents,
   PyOutPortsScan,
 } from "./pyout.js"
 import { PyOutType } from "./pyout.js"
 import type PyFileData from "./pyfileData.js"
-import type { IntermediateStats } from "./pyfileData.js"
+import type { IntermediateStats, RenameResult } from "./pyfileData.js"
 import type { ScanOptions } from "./generateFileHashes.js"
 import { scanFolder } from "./generateFileHashes.js"
 import { EventEmitter } from "events"
@@ -41,6 +42,7 @@ enum OperationType {
   deleteFolderRecursive,
   calcHashes,
   getItemStat,
+  renameItem,
 
   // other
   reset,
@@ -681,6 +683,52 @@ export class PyboardRunner extends EventEmitter {
 
                   return
 
+                case OperationType.renameItem:
+                  if (data.includes(EOO)) {
+                    // stop operation
+                    this.operationOngoing = OperationType.none
+
+                    if (this.outBuffer.includes(ERR)) {
+                      opResult = {
+                        type: PyOutType.fsOps,
+                        status: false,
+                      } as PyOutFsOps
+                    } else {
+                      try {
+                        const jsonString: string = this.outBuffer
+                          .toString("utf-8")
+                          .replaceAll("\r", "")
+                          .replaceAll("\n", "")
+                          .slice(0, -EOO.length)
+
+                        const result: RenameResult = JSON.parse(jsonString)
+
+                        if (!result.success && result.error !== undefined) {
+                          console.warn(
+                            "[pyboard-serial-com] rename operation " +
+                              "failed with message: %s",
+                            result.error
+                          )
+                        }
+
+                        opResult = {
+                          type: PyOutType.fsOps,
+                          status: result.success,
+                        } as PyOutFsOps
+                      } catch (e) {
+                        console.error(e)
+                        opResult = {
+                          type: PyOutType.fsOps,
+                          status: false,
+                        } as PyOutFsOps
+                      }
+                    }
+
+                    break
+                  }
+
+                  return
+
                 case OperationType.reset:
                   if (data.includes(EOO)) {
                     // stop operation
@@ -1199,6 +1247,30 @@ export class PyboardRunner extends EventEmitter {
         },
       },
       OperationType.getItemStat
+    )
+  }
+
+  /**
+   * Renames a file or folder on the remote host
+   *
+   * @param oldPath The current path of the item to rename
+   * @param newPath Should be in same dir as oldPath
+   * @returns
+   */
+  public async renameItem(oldPath: string, newPath: string): Promise<PyOut> {
+    if (!this.pipeConnected) {
+      return { type: PyOutType.none }
+    }
+
+    return this.runCommand(
+      {
+        command: "rename",
+        args: {
+          item: oldPath,
+          target: newPath,
+        },
+      },
+      OperationType.renameItem
     )
   }
 

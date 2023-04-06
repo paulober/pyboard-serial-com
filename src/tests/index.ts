@@ -53,6 +53,16 @@ setTimeout(async () => {
   processStat(result)
   result = await pyboardRunner.getItemStat("/example123.py")
   processStat(result)
+
+  result = await pyboardRunner.renameItem("/example.py", "/example123.py")
+  console.log("Rename result: " + JSON.stringify(result))
+  result = await pyboardRunner.getItemStat("/example123.py")
+  processStat(result)
+  result = await pyboardRunner.renameItem("/example123.py", "/example.py")
+  console.log("Rename back result: " + JSON.stringify(result))
+  result = await pyboardRunner.getItemStat("/example123.py")
+  processStat(result)
+
   pyboardRunner.disconnect()
   exit(0)
 
