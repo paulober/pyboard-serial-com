@@ -295,6 +295,29 @@ class Wrapper:
         """
         pyboard.filesystem_command(self.pyb, ["rmdir_recursive", folder])
 
+    def rm_file_or_dir(self, path: str, recursive: bool):
+        """Removes a file or folder on the pyboard.
+
+        Args:
+            path (str): The path to the file or folder to remove on the remote host.
+        """
+        self.pyb.exec_raw(mpyFunctions.FC_IS_DIR)
+        
+        ret, err = self.pyb.exec_raw(f"print('D' if __pico_is_dir('{path}') else 'F')")
+        if err:
+            print(ERR, flush=True)
+        else:
+            is_dir = ret.decode().strip() == 'D'
+            if is_dir:
+                if recursive:
+                    pyboard.filesystem_command(self.pyb, ["rmdir_recursive", path])
+                else:
+                    pyboard.filesystem_command(self.pyb, ["rmdir", path])
+            else:
+                pyboard.filesystem_command(self.pyb, ["rm", path])
+
+        self.pyb.exec_raw("del __pico_is_dir")
+
     def calc_file_hashes(self, files: list[str]):
         """Calculates the hashes of (a) file(s) on the pico.
 
@@ -726,6 +749,13 @@ if __name__ == "__main__":
             ##############################################
             elif line["command"] == "rmtree" and "folders" in line["args"]:
                 wrapper.rmdir_recursive(line["args"]["folders"][0])
+
+            ####################################################
+            # Remove file or folder (recursively) with pyboard #
+            ####################################################
+            elif line["command"] == "rm_file_or_dir" and "target" in line["args"]:
+                recursive = "recursive" in line["args"] and line["args"]["recursive"] == True
+                wrapper.rm_file_or_dir(line["args"]["target"], recursive)
 
             ##############################################
             ######## Get file hashes with pyboard ########

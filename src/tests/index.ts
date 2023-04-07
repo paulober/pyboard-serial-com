@@ -99,6 +99,18 @@ setTimeout(async () => {
     }
   }
 
+  result = await pyboardRunner.createFolders(["/test_rm"])
+  if (result.type === PyOutType.status) {
+    const commandResult = (result as PyOutStatus).status
+    console.log("Create folders result: " + commandResult)
+  }
+  result = await pyboardRunner.deleteFileOrFolder("/test_rm", true)
+  if (result.type === PyOutType.status) {
+    const commandResult = (result as PyOutStatus).status
+    console.log("Delete file or folder result: " + commandResult)
+  }
+  await pyboardRunner.listContentsRecursive("/").then(listDataCp)
+
   pyboardRunner.disconnect()
   exit(0)
 

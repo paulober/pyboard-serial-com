@@ -41,6 +41,7 @@ enum OperationType {
   createFolders,
   deleteFolders,
   deleteFolderRecursive,
+  deleteFileOrFolder,
   calcHashes,
   getItemStat,
   renameItem,
@@ -65,6 +66,7 @@ type Command = {
     | "mkdirs"
     | "rmdirs"
     | "rmtree"
+    | "rm_file_or_dir"
     | "calc_file_hashes"
     | "get_item_stat"
     | "rename"
@@ -90,6 +92,7 @@ type Command = {
      */
     time?: string
     verbose?: boolean
+    recursive?: boolean
   }
 }
 
@@ -345,7 +348,7 @@ export class PyboardRunner extends EventEmitter {
   }
 
   private onError(err: Error): void {
-    console.log(`error: ${err.message}`)
+    console.log(`[pyboard-serial-com] onError: ${err.message}`)
   }
 
   public isPipeConnected(): boolean {
@@ -542,6 +545,7 @@ export class PyboardRunner extends EventEmitter {
                 case OperationType.createFolders:
                 case OperationType.deleteFolders:
                 case OperationType.deleteFolderRecursive:
+                case OperationType.deleteFileOrFolder:
                 case OperationType.syncRtc:
                   if (data.includes(EOO)) {
                     // stop operation
@@ -1148,6 +1152,33 @@ export class PyboardRunner extends EventEmitter {
   }
 
   /**
+   * Deletes a file or folder on the Pico (recursive)
+   *
+   * @param path The path to the file or folder to delete (without ':')
+   * @param recursive If the delete should be recursive
+   * @returns
+   */
+  public async deleteFileOrFolder(
+    path: string,
+    recursive: boolean
+  ): Promise<PyOut> {
+    if (!this.pipeConnected) {
+      return { type: PyOutType.none }
+    }
+
+    return this.runCommand(
+      {
+        command: "rm_file_or_dir",
+        args: {
+          target: path,
+          recursive: recursive,
+        },
+      },
+      OperationType.deleteFileOrFolder
+    )
+  }
+
+  /**
    * Starts the upload process of a project folder
    * After this operation it will not trigger the 'out' callback
    * instead it will transition to the 'uploading' state and then emit and fsOps
@@ -1272,6 +1303,12 @@ export class PyboardRunner extends EventEmitter {
     )
   }
 
+  /**
+   * Get fs details of a file or folder on the Pico
+   *
+   * @param itemPath The path of the item on the Pico
+   * @returns
+   */
   public async getItemStat(itemPath: string): Promise<PyOut> {
     if (!this.pipeConnected) {
       return { type: PyOutType.none }
@@ -1293,7 +1330,7 @@ export class PyboardRunner extends EventEmitter {
    *
    * @param oldPath The current path of the item to rename
    * @param newPath Should be in same dir as oldPath
-   * @returns
+   * @returns {PyOutStatus} PyOutStatus or PyOutType.none if pipe is not connected
    */
   public async renameItem(oldPath: string, newPath: string): Promise<PyOut> {
     if (!this.pipeConnected) {

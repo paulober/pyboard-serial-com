@@ -14,7 +14,7 @@ def is_file(file_path):
 
 FC_IS_DIR = """\
 import uos
-def is_dir(file_path):
+def __pico_is_dir(file_path):
     try:
         stat = uos.stat(file_path)
         return (stat[0] & 0o170000) == 0o040000
@@ -53,6 +53,7 @@ def FC_SYNC_RTC(now: datetime) -> str:
     return f"from machine import RTC as __pico_RTC; __pico_RTC().datetime(({now.year}, {now.month}, {now.day}, {now.weekday()}, {now.hour}, {now.minute}, {now.second}, 0)); del __pico_RTC"
 
 # DEPRECATED
-#LAMBDA_GET_RTC_TIME = "(lambda: (print(__pico_rtc.datetime())) if '__pico_rtc' in globals() and __pico_rtc else (print(__import__('machine', globals()).RTC().datetime())))()"
+# LAMBDA_GET_RTC_TIME = "(lambda: (print(__pico_rtc.datetime())) if '__pico_rtc' in globals() and __pico_rtc else (print(__import__('machine', globals()).RTC().datetime())))()"
+
 
 FC_GET_RTC_TIME = """from machine import RTC as __pico_RTC; print(__pico_RTC().datetime()); del __pico_RTC"""
