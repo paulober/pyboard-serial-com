@@ -50,6 +50,7 @@ enum OperationType {
   reset,
   syncRtc,
   getRtcTime,
+  exit,
 }
 
 type Command = {
@@ -398,6 +399,10 @@ export class PyboardRunner extends EventEmitter {
         this.proc.stdin.write(JSON.stringify(command) + "\n", err => {
           errOccured = err instanceof Error
         })
+        if (this.operationOngoing === OperationType.exit) {
+          this.operationOngoing = OperationType.none
+          resolve({ type: PyOutType.none } as PyOut)
+        }
 
         if (errOccured) {
           // operation failed
@@ -1436,9 +1441,9 @@ export class PyboardRunner extends EventEmitter {
   /**
    * Closes the current serial connection to the Pico
    */
-  public disconnect(): void {
+  public async disconnect(): Promise<void> {
     // TODO: maybe also remove all pending operations from the queue?
-    this.proc.stdin.write(JSON.stringify({ command: "exit", args: {} }) + "\n")
+    await this.runCommand({ command: "exit", args: {} }, OperationType.exit)
 
     if (this.isPipeConnected()) {
       this.proc.kill()

@@ -111,7 +111,7 @@ setTimeout(async () => {
   }
   await pyboardRunner.listContentsRecursive("/").then(listDataCp)
 
-  pyboardRunner.disconnect()
+  await pyboardRunner.disconnect()
   exit(0)
 
   console.log("===== Finished adding all operations!")
