@@ -1445,6 +1445,9 @@ export class PyboardRunner extends EventEmitter {
     // TODO: maybe also remove all pending operations from the queue?
     await this.runCommand({ command: "exit", args: {} }, OperationType.exit)
 
+    // wait for the sub-process to exit
+    await new Promise(resolve => setTimeout(resolve, 500))
+
     if (this.isPipeConnected()) {
       this.proc.kill()
       this.pipeConnected = false
