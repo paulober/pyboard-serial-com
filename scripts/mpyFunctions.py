@@ -1,4 +1,5 @@
 # Description: Functions for the file system as oder control operations on the pico
+from datetime import datetime
 
 FC_IS_FILE = """\
 import uos
@@ -43,3 +44,15 @@ def rename_file(old_name, new_name):
     except OSError as e:
         print('{"success": false, "error": "' + str(e) + '"}')
 """
+
+
+# old set sync RTC code backup
+# f"\r__pico_rtc = __import__('machine', globals()).RTC(); __pico_rtc.datetime(({now.year}, {now.month}, {now.day}, {now.weekday()}, {now.hour}, {now.minute}, {now.second}, 0))"
+
+def FC_SYNC_RTC(now: datetime) -> str:
+    return f"from machine import RTC as __pico_RTC; __pico_RTC().datetime(({now.year}, {now.month}, {now.day}, {now.weekday()}, {now.hour}, {now.minute}, {now.second}, 0)); del __pico_RTC"
+
+# DEPRECATED
+#LAMBDA_GET_RTC_TIME = "(lambda: (print(__pico_rtc.datetime())) if '__pico_rtc' in globals() and __pico_rtc else (print(__import__('machine', globals()).RTC().datetime())))()"
+
+FC_GET_RTC_TIME = """from machine import RTC as __pico_RTC; print(__pico_RTC().datetime()); del __pico_RTC"""

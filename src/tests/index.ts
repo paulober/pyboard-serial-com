@@ -7,6 +7,8 @@ import type {
   PyOutCommandResult,
   PyOutCommandWithResponse,
   PyOutGetItemStat,
+  PyOutRtcTime,
+  PyOutStatus,
 } from "../pyout.js"
 
 const pyboardRunner = new PyboardRunner(
@@ -63,6 +65,40 @@ setTimeout(async () => {
   result = await pyboardRunner.getItemStat("/example123.py")
   processStat(result)
 
+  result = await pyboardRunner.getRtc()
+  if (result.type === PyOutType.getRtcTime) {
+    const rtcTime = (result as PyOutRtcTime).time
+    if (rtcTime !== null) {
+      console.log(
+        "RTC time: " +
+          rtcTime?.toLocaleDateString() +
+          " " +
+          rtcTime?.toLocaleTimeString()
+      )
+    } else {
+      console.error("RTC time is null!")
+    }
+  }
+  result = await pyboardRunner.syncRtc()
+  if (result.type === PyOutType.status) {
+    const commandResult = (result as PyOutStatus).status
+    console.log("Sync RTC result: " + commandResult)
+  }
+  result = await pyboardRunner.getRtc()
+  if (result.type === PyOutType.getRtcTime) {
+    const rtcTime = (result as PyOutRtcTime).time
+    if (rtcTime !== null) {
+      console.log(
+        "RTC time: " +
+          rtcTime?.toLocaleDateString() +
+          " " +
+          rtcTime?.toLocaleTimeString()
+      )
+    } else {
+      console.error("RTC time is null!")
+    }
+  }
+
   pyboardRunner.disconnect()
   exit(0)
 
@@ -96,8 +132,8 @@ process.on("SIGINT", () => {
   pyboardRunner.switchDevice("COM3")
   setTimeout(async () => {
     /*pyboardRunner.deleteFolderRecursive("/").then((data: PyOut) => {
-      if (data.type === PyOutType.fsOps) {
-        const result = data as PyOutFsOps
+      if (data.type === PyOutType.status) {
+        const result = data as PyOutStatus
         console.log(`Delete folder status: ${result.status}`)
       }
     })
@@ -123,8 +159,8 @@ process.on("SIGINT", () => {
         }
       }
     )
-    if (uploadResult.type === PyOutType.fsOps) {
-      const result = uploadResult as PyOutFsOps
+    if (uploadResult.type === PyOutType.status) {
+      const result = uploadResult as PyOutStatus
       console.log(`Upload project status: ${result.status}`)
     }
 
@@ -136,8 +172,8 @@ process.on("SIGINT", () => {
         console.log(data)
       }
     ).then((data: PyOut) => {
-      if (data.type === PyOutType.fsOps) {
-        const result = data as PyOutFsOps
+      if (data.type === PyOutType.status) {
+        const result = data as PyOutStatus
         console.log(`Download project status: ${result.status}`)
       }
     })*/

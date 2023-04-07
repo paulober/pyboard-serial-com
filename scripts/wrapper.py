@@ -10,6 +10,7 @@ import threading
 import time
 import signal
 import platform
+from datetime import datetime
 
 EOO = "!!EOO!!"  # End of operation
 ERR = "!!ERR!!"  # Error
@@ -410,6 +411,21 @@ def hash_file(file):
         except:
             print(ERR, flush=True)
 
+    def sync_rtc(self):
+        """Syncs the RTC on the pyboard with the PC's RTC."""
+        # exec without data_consumer, also to set it as fast as possible
+        _, err = self.pyb.exec_raw("\r"+mpyFunctions.FC_SYNC_RTC(datetime.now()))
+        if err:
+            print(ERR, flush=True)
+
+    def get_rtc_time(self):
+        """Gets the RTC time on the pyboard."""
+        ret, err = self.pyb.exec_raw("\r"+mpyFunctions.FC_GET_RTC_TIME)
+        if err:
+            print(ERR, flush=True)
+        else:
+            print(ret.decode("utf-8"), flush=True)
+
     def reboot(self, verbose: bool = False):
         """
         Reboots the pyboard.
@@ -619,6 +635,12 @@ if __name__ == "__main__":
                     wrapper.pyb.close()
                     raise SerialException
                 print("OK", flush=True)
+
+            elif line["command"] == "sync_rtc":
+                wrapper.sync_rtc()
+
+            elif line["command"] == "get_rtc_time":
+                wrapper.get_rtc_time()
 
             elif line["command"] == "soft_reset":
                 wrapper.soft_reset()

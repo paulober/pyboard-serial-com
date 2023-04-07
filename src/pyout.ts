@@ -6,8 +6,9 @@ export enum PyOutType {
   commandWithResponse,
   commandResult,
   listContents,
-  fsOps,
+  status,
   getItemStat,
+  getRtcTime,
 }
 
 export interface PyOut {
@@ -29,8 +30,11 @@ export interface PyOutListContents extends PyOut {
   response: PyFileData[]
 }
 
-export interface PyOutFsOps extends PyOut {
-  type: PyOutType.fsOps
+export interface PyOutStatus extends PyOut {
+  type: PyOutType.status
+  /**
+   * True menas operation was successful and false means it failed
+   */
   status: boolean
 }
 
@@ -42,4 +46,9 @@ export interface PyOutPortsScan extends PyOut {
 export interface PyOutGetItemStat extends PyOut {
   type: PyOutType.getItemStat
   stat: PyFileData | null
+}
+
+export interface PyOutRtcTime extends PyOut {
+  type: PyOutType.getRtcTime
+  time: Date | null
 }

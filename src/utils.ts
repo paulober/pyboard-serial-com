@@ -26,29 +26,30 @@ export async function createFolderStructure(
 }
 
 /**
- * Converts the rp2 datetime format to a Date object
+ * Converts the rp2 datetime format to a standard V8 Date object
  *
- * @param datetime The rp2 rtc.datetime() format: (yyyy, mm, dd, <12h>, hh, mm, ss, 0)
- * <12h> is probably the hour in 12h format -> 3 (3pm, 12h format) == 15 (15 o'clock, 24h format)
+ * @param datetime The rp2 rtc.datetime() format: (yyyy, m, d, weekday, h, m, s, 0)
+ * weekday: 0 = Monday, 1 = Tuesday, ..., 6 = Sunday
+ * 0 because the rp2 does not support subseconds/milliseconds
  */
 export function rp2DatetimeToDate(datetime: string): Date | null {
   const match =
     // eslint-disable-next-line max-len
-    /^\((\d{4}),\s*(\d{1,2}),\s*(\d{1,2}),\s*(?:\d{1,2}),\s*(\d{1,2}),\s*(\d{1,2}),\s*(\d{1,2}),\s*0\)$/gm.exec(
+    /^\((\d{4}),\s*(\d{1,2}),\s*(\d{1,2}),\s*(\d{1,2}),\s*(\d{1,2}),\s*(\d{1,2}),\s*(\d{1,2}),\s*(?:\d{1,2})\)$/gm.exec(
       datetime
     )
   if (!match) {
     return null
   }
 
-  const [, year, month, day, hour24, minute, second] = match.map(Number)
+  const [, year, month, day, , hour, minute, second] = match.map(Number)
   if (
     month < 1 ||
     month > 12 ||
     day < 1 ||
     day > 31 ||
-    hour24 < 0 ||
-    hour24 > 23 ||
+    hour < 0 ||
+    hour > 23 ||
     minute < 0 ||
     minute > 59 ||
     second < 0 ||
@@ -57,5 +58,26 @@ export function rp2DatetimeToDate(datetime: string): Date | null {
     return null
   }
 
-  return new Date(year, month - 1, day, hour24, minute, second)
+  return new Date(year, month - 1, day, hour, minute, second)
+}
+
+/**
+ * Converts a Date object to the rp2 datetime format tuple
+ *
+ * @param date Normal V8 Date object
+ * @returns
+ */
+export function dateToRp2Datetime(date: Date): string {
+  const year = date.getFullYear()
+  // month is 0-based but the rp2 datetime format is 1-based
+  const month = date.getMonth() + 1
+  const day = date.getDate()
+  const hour = date.getHours()
+  const minute = date.getMinutes()
+  const second = date.getSeconds()
+
+  return (
+    `(${year}, ${month}, ${day}, ${date.getDay()}, ` +
+    `${hour}, ${minute}, ${second}, 0)`
+  )
 }

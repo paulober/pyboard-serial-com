@@ -5,10 +5,11 @@ import type {
   PyOut,
   PyOutCommandResult,
   PyOutCommandWithResponse,
-  PyOutFsOps,
+  PyOutStatus,
   PyOutGetItemStat,
   PyOutListContents,
   PyOutPortsScan,
+  PyOutRtcTime,
 } from "./pyout.js"
 import { PyOutType } from "./pyout.js"
 import type PyFileData from "./pyfileData.js"
@@ -19,7 +20,7 @@ import { EventEmitter } from "events"
 import { EOL } from "os"
 import { existsSync } from "fs"
 import { fileURLToPath } from "url"
-import { rp2DatetimeToDate } from "./utils.js"
+import { dateToRp2Datetime, rp2DatetimeToDate } from "./utils.js"
 
 const EOO: string = "!!EOO!!"
 // This string is also hardcoded into pyboard.py at various places
@@ -46,6 +47,8 @@ enum OperationType {
 
   // other
   reset,
+  syncRtc,
+  getRtcTime,
 }
 
 type Command = {
@@ -65,6 +68,8 @@ type Command = {
     | "calc_file_hashes"
     | "get_item_stat"
     | "rename"
+    | "sync_rtc"
+    | "get_rtc_time"
     | "exit"
     | "soft_reset"
     | "hard_reset"
@@ -80,6 +85,10 @@ type Command = {
     remote?: string
     // eslint-disable-next-line @typescript-eslint/naming-convention
     local_base_dir?: string
+    /**
+     * Should be in RP2 MicroPython datetime format
+     */
+    time?: string
     verbose?: boolean
   }
 }
@@ -533,12 +542,13 @@ export class PyboardRunner extends EventEmitter {
                 case OperationType.createFolders:
                 case OperationType.deleteFolders:
                 case OperationType.deleteFolderRecursive:
+                case OperationType.syncRtc:
                   if (data.includes(EOO)) {
                     // stop operation
                     this.operationOngoing = OperationType.none
 
                     opResult = {
-                      type: PyOutType.fsOps,
+                      type: PyOutType.status,
                       // return false if operation experienced an error
                       status: this.outBuffer.includes(ERR)
                         ? this.outBuffer.includes("EXIST")
@@ -690,9 +700,9 @@ export class PyboardRunner extends EventEmitter {
 
                     if (this.outBuffer.includes(ERR)) {
                       opResult = {
-                        type: PyOutType.fsOps,
+                        type: PyOutType.status,
                         status: false,
-                      } as PyOutFsOps
+                      } as PyOutStatus
                     } else {
                       try {
                         const jsonString: string = this.outBuffer
@@ -712,16 +722,44 @@ export class PyboardRunner extends EventEmitter {
                         }
 
                         opResult = {
-                          type: PyOutType.fsOps,
+                          type: PyOutType.status,
                           status: result.success,
-                        } as PyOutFsOps
+                        } as PyOutStatus
                       } catch (e) {
                         console.error(e)
                         opResult = {
-                          type: PyOutType.fsOps,
+                          type: PyOutType.status,
                           status: false,
-                        } as PyOutFsOps
+                        } as PyOutStatus
                       }
+                    }
+
+                    break
+                  }
+
+                  return
+
+                case OperationType.getRtcTime:
+                  if (data.includes(EOO)) {
+                    // stop operation
+                    this.operationOngoing = OperationType.none
+
+                    if (this.outBuffer.includes(ERR)) {
+                      opResult = {
+                        type: PyOutType.getRtcTime,
+                        time: null,
+                      } as PyOutRtcTime
+                    } else {
+                      const time: string = this.outBuffer
+                        .toString("utf-8")
+                        .replaceAll("\r", "")
+                        .replaceAll("\n", "")
+                        .slice(0, -EOO.length)
+
+                      opResult = {
+                        type: PyOutType.getRtcTime,
+                        time: rp2DatetimeToDate(time),
+                      } as PyOutRtcTime
                     }
 
                     break
@@ -787,7 +825,7 @@ export class PyboardRunner extends EventEmitter {
                       })
                       .catch(() => {
                         resolve({
-                          type: PyOutType.fsOps,
+                          type: PyOutType.status,
                           status: false,
                         } as PyOut)
                       })
@@ -798,7 +836,7 @@ export class PyboardRunner extends EventEmitter {
                       })
                       .catch(() => {
                         resolve({
-                          type: PyOutType.fsOps,
+                          type: PyOutType.status,
                           status: false,
                         } as PyOut)
                       })
@@ -1251,7 +1289,7 @@ export class PyboardRunner extends EventEmitter {
   }
 
   /**
-   * Renames a file or folder on the remote host
+   * Renames a file or folder on the Pico (W)
    *
    * @param oldPath The current path of the item to rename
    * @param newPath Should be in same dir as oldPath
@@ -1271,6 +1309,46 @@ export class PyboardRunner extends EventEmitter {
         },
       },
       OperationType.renameItem
+    )
+  }
+
+  /**
+   * Sync the RTC on the Pico (W) with the local system time
+   *
+   * @returns {PyOutStatus} PyOutStatus with status false if pipe is not connected not `type: none`!
+   */
+  public async syncRtc(): Promise<PyOut> {
+    if (!this.pipeConnected) {
+      return { type: PyOutType.status, status: false } as PyOutStatus
+    }
+
+    return this.runCommand(
+      {
+        command: "sync_rtc",
+        // "args.time" is set later in the wrapper
+        // to get it as accurate as possible
+        args: {},
+      },
+      OperationType.syncRtc
+    )
+  }
+
+  /**
+   * Get the RTC time on the Pico (W) as a Date object
+   *
+   * @returns {PyOutRtcTime} PyOutRtcTime
+   */
+  public async getRtc(): Promise<PyOut> {
+    if (!this.pipeConnected) {
+      return { type: PyOutType.none }
+    }
+
+    return this.runCommand(
+      {
+        command: "get_rtc_time",
+        args: {},
+      },
+      OperationType.getRtcTime
     )
   }
 
