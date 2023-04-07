@@ -147,7 +147,7 @@ export class PyboardRunner extends EventEmitter {
    * For example: "python" on Windows or "python3" on Linux
    */
   constructor(
-    device: string,
+    device: string = "defualt",
     err: (data: Buffer | undefined) => void,
     exit: (code: number, signal: string) => void,
     pythonExe: string = "default"
@@ -168,7 +168,9 @@ export class PyboardRunner extends EventEmitter {
     this.device = device
     this.pythonExe = pythonExe
 
-    console.debug(`[pyboard-serial-com] Connecting to ${this.device}`)
+    if (this.device !== "default") {
+      console.debug(`[pyboard-serial-com] Connecting to ${this.device}`)
+    }
 
     this.proc = spawn(
       this.pythonExe,
@@ -329,6 +331,10 @@ export class PyboardRunner extends EventEmitter {
   private onExit(code: number, signal: string): void {
     this.pipeConnected = false
     if (this.operationOngoing !== OperationType.reset) {
+      // default connection only to setup PyboardRunner class
+      if (code === 0x12f9) {
+        return
+      }
       this.exit(code, signal)
     } else {
       this.spawnNewProcess()

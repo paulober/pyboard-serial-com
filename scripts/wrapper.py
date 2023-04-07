@@ -302,7 +302,7 @@ class Wrapper:
             path (str): The path to the file or folder to remove on the remote host.
         """
         self.pyb.exec_raw(mpyFunctions.FC_IS_DIR)
-        
+
         ret, err = self.pyb.exec_raw(f"print('D' if __pico_is_dir('{path}') else 'F')")
         if err:
             print(ERR, flush=True)
@@ -568,7 +568,7 @@ if __name__ == "__main__":
             exit(0)
 
         if args.device == "default":
-            sys.exit(1)
+            sys.exit(0x12F9)
 
         wrapper = Wrapper(args.device, args.baudrate)
 
