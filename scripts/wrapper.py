@@ -372,7 +372,7 @@ def hash_file(file):
         self.exec_cmd(f"get_file_info('{item}')")
         self.exec_cmd("del get_file_info")
 
-    def exec_cmd(self, cmd: str | bytes, follow: bool | None = None):
+    def exec_cmd(self, cmd: str | bytes, follow: bool | None = None, full_output: bool = False):
         """Executes a command on the pyboard.
 
         Args:
@@ -392,8 +392,10 @@ def hash_file(file):
             # self.pyb.close()
             # pyboard.stdout_write_bytes(ret_err)
             # sys.exit(1)
-
-            print(ERR, flush=True)
+            if full_output:
+                print(ret_err.decode("utf-8"), flush=True)
+            else:
+                print(ERR, flush=True)
 
     def exec_friendly_cmd(self, cmd: str):
         """Executes a command on the pyboard.
@@ -432,7 +434,7 @@ def hash_file(file):
                 if filename.endswith(".mpy") and pyfile[0] == ord("M"):
                     self.pyb.exec_("_injected_buf=" + repr(pyfile))
                     pyfile = pyboard._injected_import_hook_code
-                self.exec_cmd(pyfile)
+                self.exec_cmd(pyfile, full_output=True)
 
         except:
             print(ERR, flush=True)
