@@ -408,7 +408,8 @@ def hash_file(file):
         buf = wrap_expressions_with_print(cmd).encode("utf-8")
         stdio_thread.start()
 
-        self.pyb.exec_raw(buf, timeout=None, data_consumer=pyboard.stdout_write_bytes)
+        _, err = self.pyb.exec_raw(
+            buf, timeout=None, data_consumer=pyboard.stdout_write_bytes)
 
         # stop the thread
         stop_event.set()
@@ -416,6 +417,8 @@ def hash_file(file):
         sys.stdout.write("!!__SENTINEL__!!")
         sys.stdout.flush()
         stdio_thread.join()
+        if err:
+            print(err, flush=True)
 
     def run_file(self, filename: str):
         """Runs a file on the pyboard.

@@ -106,6 +106,17 @@ function getScriptsRoot(): string {
   return join(dirname(fileURLToPath(import.meta.url)), "scripts")
 }
 
+function cleanBuffer(buffer: Buffer): string {
+  return buffer
+    .toString("utf-8")
+    .replace(EOO + "\r\n", "")
+    .replace(EOO + "\n", "")
+    .replace(EOO, "")
+    .replace("!!JSONDecodeError!!" + "\r\n", "")
+    .replace("!!JSONDecodeError!!" + "\n", "")
+    .replace("!!JSONDecodeError!!", "")
+}
+
 export class PyboardRunner extends EventEmitter {
   public proc: ChildProcessWithoutNullStreams
   private pipeConnected: boolean = false
@@ -470,13 +481,10 @@ export class PyboardRunner extends EventEmitter {
                     // if data contains more than EOO, then return other stuff before quitting
                     if (data.toString("utf-8").trim() !== EOO) {
                       // remove EOO from data (-4 because \n before and after EOO)
-                      this.outBuffer = this.outBuffer.slice(
-                        0,
-                        -EOO.length - EOL.length
-                      )
+                      const response = cleanBuffer(this.outBuffer)
 
                       if (follow) {
-                        follow(this.outBuffer.toString("utf-8"))
+                        follow(response)
                       }
                     }
 
@@ -495,7 +503,9 @@ export class PyboardRunner extends EventEmitter {
                   } else {
                     // either keep in buffer or write into cb and clean buffer
                     if (follow) {
-                      follow(this.outBuffer.toString("utf-8"))
+                      const response = cleanBuffer(this.outBuffer)
+
+                      follow(response)
                     }
                     // if not follow result has to be kept in buffer so return to avoid clean-up
                     else {
