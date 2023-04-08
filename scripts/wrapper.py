@@ -418,7 +418,7 @@ def hash_file(file):
         sys.stdout.flush()
         stdio_thread.join()
         if err:
-            print(err, flush=True)
+            print(err.decode("utf-8"), flush=True)
 
     def run_file(self, filename: str):
         """Runs a file on the pyboard.
