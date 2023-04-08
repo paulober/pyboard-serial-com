@@ -497,7 +497,7 @@ export class PyboardRunner extends EventEmitter {
                       // return full buffer
                       opResult = {
                         type: PyOutType.commandWithResponse,
-                        response: this.outBuffer.toString("utf-8"),
+                        response: cleanBuffer(this.outBuffer),
                       } as PyOutCommandWithResponse
                     }
                   } else {
@@ -921,7 +921,7 @@ export class PyboardRunner extends EventEmitter {
    */
   public async executeCommand(
     command: string,
-    follow: (data: string) => void
+    follow?: (data: string) => void
   ): Promise<PyOut> {
     if (!this.pipeConnected) {
       return { type: PyOutType.none }
