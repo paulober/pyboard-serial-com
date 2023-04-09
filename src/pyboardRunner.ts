@@ -300,11 +300,10 @@ export class PyboardRunner extends EventEmitter {
   }
 
   public switchDevice(device: string): void {
-    if (this.device === device) {
-      return
-    }
-
     if (this.isPipeConnected()) {
+      if (this.device === device) {
+        return
+      }
       this.disconnect()
     }
     if (!this.proc.killed) {
