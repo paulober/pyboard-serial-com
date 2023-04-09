@@ -47,6 +47,11 @@ function processStat(result: PyOut): void {
 setTimeout(async () => {
   console.log("===== Adding all operations!")
 
+  const result123 = await pyboardRunner.softReset()
+  console.log("Soft reset result: " + JSON.stringify(result123))
+  await pyboardRunner.disconnect()
+  exit(0)
+
   //pyboardRunner.listContents("/").then(listDataCp)
   //await PyboardRunner.getPorts()
   let result = await pyboardRunner.getItemStat("/example.py")

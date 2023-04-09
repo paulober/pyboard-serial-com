@@ -807,7 +807,7 @@ export class PyboardRunner extends EventEmitter {
                     } else {
                       opResult = {
                         type: PyOutType.commandResult,
-                        result: this.outBuffer.includes(ERR),
+                        result: !this.outBuffer.includes(ERR),
                       } as PyOutCommandResult
                     }
 
