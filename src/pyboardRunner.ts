@@ -197,6 +197,13 @@ export class PyboardRunner extends EventEmitter {
     this.proc.stdin.setDefaultEncoding("utf-8")
 
     this.proc.on("spawn", () => {
+      if (this.device === "default") {
+        this.proc.disconnect()
+        this.proc.kill()
+
+        return
+      }
+
       this.pipeConnected = true
       console.debug("Spawned")
 
