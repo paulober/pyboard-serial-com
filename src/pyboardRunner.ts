@@ -17,10 +17,9 @@ import type { IntermediateStats, RenameResult } from "./pyfileData.js"
 import type { ScanOptions } from "./generateFileHashes.js"
 import { scanFolder } from "./generateFileHashes.js"
 import { EventEmitter } from "events"
-import { EOL } from "os"
 import { existsSync } from "fs"
 import { fileURLToPath } from "url"
-import { dateToRp2Datetime, rp2DatetimeToDate } from "./utils.js"
+import { rp2DatetimeToDate } from "./utils.js"
 
 const EOO: string = "!!EOO!!"
 // This string is also hardcoded into pyboard.py at various places
@@ -474,9 +473,11 @@ export class PyboardRunner extends EventEmitter {
                     this.proc.stdin.write("\n")
 
                     // remove sentinel from buffer as it could contain more
-                    this.outBuffer = this.outBuffer.slice(
-                      0,
-                      -"!!__SENTINEL__!!".length
+                    this.outBuffer = Buffer.from(
+                      this.outBuffer
+                        .toString("utf-8")
+                        .replace("!!__SENTINEL__!!", ""),
+                      "utf-8"
                     )
                   }
 
