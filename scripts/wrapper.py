@@ -685,7 +685,11 @@ if __name__ == "__main__":
 
             elif line["command"] == "command" and "command" in line["args"]:
                 # [5:] to remove the ".cmd " from the start of the string
-                wrapper.exec_cmd(line["args"]["command"])
+                interactive = "interactive" in line["args"] and line["args"]["interactive"]
+                if interactive:
+                    wrapper.exec_friendly_cmd(line["args"]["command"].encode("utf-8"))
+                else:
+                    wrapper.exec_cmd(line["args"]["command"])
 
             elif line["command"] == "friendly_code" and "code" in line["args"]:
                 wrapper.exec_friendly_cmd(line["args"]["code"])

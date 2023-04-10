@@ -93,6 +93,7 @@ type Command = {
     time?: string
     verbose?: boolean
     recursive?: boolean
+    interactive?: boolean
   }
 }
 
@@ -928,7 +929,8 @@ export class PyboardRunner extends EventEmitter {
    */
   public async executeCommand(
     command: string,
-    follow?: (data: string) => void
+    follow?: (data: string) => void,
+    interactive?: boolean
   ): Promise<PyOut> {
     if (!this.pipeConnected) {
       return { type: PyOutType.none }
@@ -939,6 +941,7 @@ export class PyboardRunner extends EventEmitter {
         command: "command",
         args: {
           command: command,
+          interactive: interactive,
         },
       },
       OperationType.command,
