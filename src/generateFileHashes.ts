@@ -10,7 +10,8 @@ export interface ScanOptions {
 
 export function scanFolder(options: ScanOptions): Map<string, string> {
   const result = new Map<string, string>()
-  const { folderPath, fileTypes, ignoredItems } = options
+  let { folderPath, fileTypes, ignoredItems } = options
+  fileTypes = fileTypes.map(item => (item[0] === "." ? item : `.${item}`))
 
   function scanDir(dir: string): void {
     const items = readdirSync(dir)

@@ -47,6 +47,27 @@ function processStat(result: PyOut): void {
 setTimeout(async () => {
   console.log("===== Adding all operations!")
 
+  const resp: PyOut | undefined = await pyboardRunner.startUploadingProject(
+    "n:\\OpenSource\\Pico-W-Stub\\board",
+    ["py", "txt", "log", "json", "xml", "html", "js", "css", "mpy"],
+    [
+      ".picowgo",
+      ".vscode",
+      ".gitignore",
+      ".git",
+      "project.pico-go",
+      "env",
+      "venv",
+      ".picowgo",
+    ],
+    (data: string) => {
+      console.log(`PUP: ${data}`)
+    }
+  )
+  if (resp !== undefined) {
+    console.log("Start uploading project response: " + JSON.stringify(resp))
+  }
+
   const result123 = await pyboardRunner.softReset()
   console.log("Soft reset result: " + JSON.stringify(result123))
   await pyboardRunner.disconnect()
