@@ -688,6 +688,7 @@ if __name__ == "__main__":
                 interactive = "interactive" in line["args"] and line["args"]["interactive"]
                 if interactive:
                     wrapper.exec_friendly_cmd(line["args"]["command"].encode("utf-8"))
+                    clear_stdin()
                 else:
                     wrapper.exec_cmd(line["args"]["command"])
 

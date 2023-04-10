@@ -474,6 +474,15 @@ export class PyboardRunner extends EventEmitter {
                     this.proc.stdin.write("\n")
 
                     // remove sentinel from buffer as it could contain more
+                    this.outBuffer = this.outBuffer.slice(
+                      0,
+                      -"!!__SENTINEL__!!".length
+                    )
+                  } else if (this.outBuffer.includes("!!__SENTINEL__!!")) {
+                    // cause stdin.readline trigger and exit to EOO
+                    // probably not needed as data does not contain sentinel
+                    this.proc.stdin.write("\n")
+
                     this.outBuffer = Buffer.from(
                       this.outBuffer
                         .toString("utf-8")
