@@ -73,7 +73,13 @@ def find_pico_ports():
     0x2E8A is the vendor ID for Raspberry Pi
     """
     # TODO: maybe return more like the name or description of the device
-    return [port.device for port in list_ports.comports() if port.pid in SUPPORTED_USB_PIDS and port.vid == 0x2E8A]
+    try:
+        return [port.device for port in list_ports.comports() if port.pid in SUPPORTED_USB_PIDS and port.vid == 0x2E8A]
+    except Exception:
+        devs = list_ports.comports()
+        if len(devs) > 0:
+            return [devs[0].device]
+        return []
 
 
 def get_directories_to_create(file_paths):
