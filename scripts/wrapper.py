@@ -403,7 +403,7 @@ def hash_file(file):
             else:
                 print(ERR, flush=True)
 
-    def exec_friendly_cmd(self, cmd: str):
+    def exec_friendly_cmd(self, cmd: str | bytes):
         """Executes a command on the pyboard.
 
         Args:
@@ -413,7 +413,8 @@ def hash_file(file):
         stdio_thread = threading.Thread(target=redirect_stdin, args=(stop_event, self,))
         # Set as a daemon thread to exit when the main program exits
         stdio_thread.daemon = True
-        buf = wrap_expressions_with_print(cmd).encode("utf-8")
+        buf: bytes = cmd if isinstance(cmd, bytes) else wrap_expressions_with_print(
+            cmd).encode("utf-8")
         stdio_thread.start()
 
         _, err = self.pyb.exec_raw(
@@ -440,7 +441,7 @@ def hash_file(file):
                 if filename.endswith(".mpy") and pyfile[0] == ord("M"):
                     self.pyb.exec_("_injected_buf=" + repr(pyfile))
                     pyfile = pyboard._injected_import_hook_code
-                self.exec_cmd(pyfile, full_output=True)
+                self.exec_friendly_cmd(pyfile)
 
         except:
             print(ERR, flush=True)
@@ -693,6 +694,8 @@ if __name__ == "__main__":
 
             elif line["command"] == "run_file" and "files" in line["args"]:
                 wrapper.run_file(line["args"]["files"][0])
+                # clear full stdin buffer
+                clear_stdin()
 
             elif line["command"] == "double_ctrlc":
                 wrapper.stop_running_stuff()
