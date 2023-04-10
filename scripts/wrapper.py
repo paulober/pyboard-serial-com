@@ -529,7 +529,8 @@ def redirect_stdin(stop_event: threading.Event, wrapper: Wrapper):
         elif c == "\x04":  # ctrl-D, end of file
             pass
         elif c:  # Only write to the serial port if there is data available
-            wrapper.pyb.serial.write(c)
+            if wrapper.pyb.serial.is_open:
+                wrapper.pyb.serial.write(c)
 
         # Add a small delay to reduce CPU usage
         time.sleep(0.01)
@@ -658,6 +659,8 @@ if __name__ == "__main__":
             elif line["command"] == "status":
                 # average 0.00154s
                 # wrapper.exec_cmd("print('OK')", False)
+                if not wrapper.pyb.serial.is_open:
+                    raise SerialException
 
                 # average 0.00279s but maybe more reliable
                 # as it would not affect running code or sth like that

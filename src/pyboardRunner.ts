@@ -50,6 +50,7 @@ enum OperationType {
   syncRtc,
   getRtcTime,
   exit,
+  checkStatus,
 }
 
 type Command = {
@@ -73,6 +74,7 @@ type Command = {
     | "sync_rtc"
     | "get_rtc_time"
     | "exit"
+    | "status"
     | "soft_reset"
     | "hard_reset"
   args: {
@@ -469,20 +471,18 @@ export class PyboardRunner extends EventEmitter {
                   // workaround because stdin.readline in wrapper.py is not terminatable
                   // and wrapper.py cannot write in its own stdin __SENTINEL__ requests
                   // us to do this
-                  if (data.includes("!!__SENTINEL__!!")) {
+                  if (
+                    data.includes("!!__SENTINEL__!!") ||
+                    this.outBuffer.includes(
+                      "!!__SENTINEL__!!",
+                      undefined,
+                      "utf-8"
+                    )
+                  ) {
                     // cause stdin.readline trigger and exit to EOO
                     this.proc.stdin.write("\n")
 
                     // remove sentinel from buffer as it could contain more
-                    this.outBuffer = this.outBuffer.slice(
-                      0,
-                      -"!!__SENTINEL__!!".length
-                    )
-                  } else if (this.outBuffer.includes("!!__SENTINEL__!!")) {
-                    // cause stdin.readline trigger and exit to EOO
-                    // probably not needed as data does not contain sentinel
-                    this.proc.stdin.write("\n")
-
                     this.outBuffer = Buffer.from(
                       this.outBuffer
                         .toString("utf-8")
@@ -805,6 +805,21 @@ export class PyboardRunner extends EventEmitter {
                     }
 
                     break
+                  }
+
+                  return
+
+                case OperationType.checkStatus:
+                  if (data.includes(EOO)) {
+                    // stop operation
+                    this.operationOngoing = OperationType.none
+
+                    opResult = {
+                      type: PyOutType.status,
+                      status:
+                        !this.outBuffer.includes(ERR) &&
+                        !this.outBuffer.includes("Exception"),
+                    } as PyOutStatus
                   }
 
                   return
@@ -1448,6 +1463,25 @@ export class PyboardRunner extends EventEmitter {
         args: {},
       },
       OperationType.reset
+    )
+  }
+
+  /**
+   * Ping the wrapper to check if it is still connected to the Pico
+   *
+   * @returns
+   */
+  public async checkStatus(): Promise<void> {
+    if (!this.pipeConnected) {
+      return
+    }
+
+    await this.runCommand(
+      {
+        command: "status",
+        args: {},
+      },
+      OperationType.checkStatus
     )
   }
 
