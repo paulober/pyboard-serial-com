@@ -820,6 +820,8 @@ export class PyboardRunner extends EventEmitter {
                         !this.outBuffer.includes(ERR) &&
                         !this.outBuffer.includes("Exception"),
                     } as PyOutStatus
+
+                    break
                   }
 
                   return
@@ -1472,7 +1474,7 @@ export class PyboardRunner extends EventEmitter {
    * @returns
    */
   public async checkStatus(): Promise<void> {
-    if (!this.pipeConnected) {
+    if (!this.pipeConnected || this.operationQueue.length > 0) {
       return
     }
 

@@ -657,22 +657,8 @@ if __name__ == "__main__":
                 exit(0)
 
             elif line["command"] == "status":
-                # average 0.00154s
-                # wrapper.exec_cmd("print('OK')", False)
-                if not wrapper.pyb.serial.is_open:
-                    raise SerialException
-
-                # average 0.00279s but maybe more reliable
-                # as it would not affect running code or sth like that
-                found = False
-                for p in list_ports.comports():
-                    if p.device == args.device:
-                        found = True
-                        break
-                if not found:
-                    wrapper.pyb.close()
-                    raise SerialException
-                print("OK", flush=True)
+                # not connection this will rais a serial exception
+                wrapper.pyb.exec_raw("print('OK')".encode("utf-8"), 5)
 
             elif line["command"] == "sync_rtc":
                 wrapper.sync_rtc()
