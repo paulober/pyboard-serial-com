@@ -291,6 +291,13 @@ export class PyboardRunner extends EventEmitter {
     this.proc.stdin.setDefaultEncoding("utf-8")
 
     this.proc.on("spawn", () => {
+      if (this.device === "default") {
+        this.proc.disconnect()
+        this.proc.kill()
+
+        return
+      }
+
       this.pipeConnected = true
       console.debug("Spawned")
 
@@ -456,7 +463,10 @@ export class PyboardRunner extends EventEmitter {
 
             if (
               data.includes("\n") ||
-              this.operationOngoing === OperationType.friendlyCommand
+              this.operationOngoing === OperationType.friendlyCommand ||
+              (this.operationOngoing === OperationType.command &&
+                command.args.interactive) ||
+              this.operationOngoing === OperationType.runFile
             ) {
               let opResult: PyOut = { type: PyOutType.none } as PyOut
 
@@ -819,6 +829,17 @@ export class PyboardRunner extends EventEmitter {
                       status:
                         !this.outBuffer.includes(ERR) &&
                         !this.outBuffer.includes("Exception"),
+                    } as PyOutStatus
+
+                    break
+                  } else if (data.includes("Exception")) {
+                    // stop operation
+                    this.operationOngoing = OperationType.none
+                    this.onExit(3, "")
+
+                    opResult = {
+                      type: PyOutType.status,
+                      status: false,
                     } as PyOutStatus
 
                     break

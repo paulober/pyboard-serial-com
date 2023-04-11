@@ -58,8 +58,6 @@ setTimeout(async () => {
 
   const result123 = await pyboardRunner.softReset()
   console.log("Soft reset result: " + JSON.stringify(result123))
-  await pyboardRunner.disconnect()
-  exit(0)
 
   //pyboardRunner.listContents("/").then(listDataCp)
   //await PyboardRunner.getPorts()
@@ -124,9 +122,6 @@ setTimeout(async () => {
     console.log("Delete file or folder result: " + commandResult)
   }
   await pyboardRunner.listContentsRecursive("/").then(listDataCp)
-
-  await pyboardRunner.disconnect()
-  exit(0)
 
   console.log("===== Finished adding all operations!")
 }, 700)
