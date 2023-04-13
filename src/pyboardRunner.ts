@@ -200,8 +200,8 @@ export class PyboardRunner extends EventEmitter {
 
     this.proc.on("spawn", () => {
       if (this.device === "default") {
-        this.proc.disconnect()
-        this.proc.kill()
+        this.proc?.disconnect()
+        this.proc?.kill()
 
         return
       }
@@ -292,8 +292,8 @@ export class PyboardRunner extends EventEmitter {
 
     this.proc.on("spawn", () => {
       if (this.device === "default") {
-        this.proc.disconnect()
-        this.proc.kill()
+        this.proc?.disconnect()
+        this.proc?.kill()
 
         return
       }
