@@ -11,6 +11,7 @@ import time
 import signal
 import platform
 from datetime import datetime
+from typing import Optional, Union
 
 EOO = "!!EOO!!"  # End of operation
 ERR = "!!ERR!!"  # Error
@@ -34,7 +35,8 @@ except ImportError:
 # ensure to reflect changes also to sanitize_remote_v2
 
 
-def sanitize_remote(file: str | None) -> str:
+# usage of Optional as str | None is not supported by Python 3.9
+def sanitize_remote(file: Optional[str]) -> str:
     """Sanitizes the remote path to be used with pyboard.filesystem_command.
 
     Args:
@@ -52,7 +54,7 @@ def sanitize_remote(file: str | None) -> str:
 
 # this is a bit faster for a list of many files instead of calling sanitize_remote for each file
 # ensure to reflect changes also to sanitize_remote
-def sanitize_remote_v2(files: list[str | None]) -> list[str]:
+def sanitize_remote_v2(files: list[Optional[str]]) -> list[str]:
     result = []
     for file in files:
         if file == "" or file == None:
@@ -378,7 +380,7 @@ def hash_file(file):
         self.exec_cmd(f"get_file_info('{item}')")
         self.exec_cmd("del get_file_info")
 
-    def exec_cmd(self, cmd: str | bytes, follow: bool | None = None, full_output: bool = False):
+    def exec_cmd(self, cmd: Union[str, bytes], follow: Optional[bool] = None, full_output: bool = False):
         """Executes a command on the pyboard.
 
         Args:
@@ -403,7 +405,7 @@ def hash_file(file):
             else:
                 print(ERR, flush=True)
 
-    def exec_friendly_cmd(self, cmd: str | bytes):
+    def exec_friendly_cmd(self, cmd: Union[str, bytes]):
         """Executes a command on the pyboard.
 
         Args:
