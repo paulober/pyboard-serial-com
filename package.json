@@ -1,6 +1,6 @@
 {
   "name": "@paulober/pyboard-serial-com",
-  "version": "1.4.24",
+  "version": "1.4.25",
   "description": "A simple library to communicate with the pyboard.py tool over serialport.",
   "module": "./dist/index.mjs",
   "type": "module",
@@ -27,16 +27,16 @@
     "test": "npm run compile-tests && node ./dist/tests/index.js"
   },
   "devDependencies": {
-    "@rollup/plugin-commonjs": "^24.1.0",
+    "@rollup/plugin-commonjs": "^25.0.0",
     "@rollup/plugin-node-resolve": "^15.0.2",
-    "@rollup/plugin-terser": "^0.4.1",
-    "@rollup/plugin-typescript": "^11.1.0",
+    "@rollup/plugin-terser": "^0.4.3",
+    "@rollup/plugin-typescript": "^11.1.1",
     "@types/node": "^16.x",
     "@types/uuid": "^9.0.1",
-    "@typescript-eslint/eslint-plugin": "^5.59.2",
-    "@typescript-eslint/parser": "^5.59.2",
-    "eslint": "^8.39.0",
-    "rollup": "^3.21.5",
+    "@typescript-eslint/eslint-plugin": "^5.59.7",
+    "@typescript-eslint/parser": "^5.59.7",
+    "eslint": "^8.41.0",
+    "rollup": "^3.23.0",
     "rollup-plugin-copy": "^3.4.0",
     "typescript": "^5.0.4"
   },

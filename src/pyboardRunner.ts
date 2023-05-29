@@ -200,7 +200,10 @@ export class PyboardRunner extends EventEmitter {
 
     this.proc.on("spawn", () => {
       if (this.device === "default") {
-        this.proc?.disconnect()
+        // check if disconnect exists (avoid method not found error)
+        if (typeof this.proc?.disconnect === "function") {
+          this.proc.disconnect()
+        }
         this.proc?.kill()
 
         return
@@ -292,7 +295,10 @@ export class PyboardRunner extends EventEmitter {
 
     this.proc.on("spawn", () => {
       if (this.device === "default") {
-        this.proc?.disconnect()
+        // check if disconnect exists (avoid method not found error)
+        if (typeof this.proc?.disconnect === "function") {
+          this.proc.disconnect()
+        }
         this.proc?.kill()
 
         return
@@ -320,6 +326,7 @@ export class PyboardRunner extends EventEmitter {
       if (this.device === device) {
         return
       }
+
       this.disconnect()
     }
     if (!this.proc.killed) {
