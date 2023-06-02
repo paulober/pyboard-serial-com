@@ -256,7 +256,6 @@ export class PyboardRunner extends EventEmitter {
           // kill child process
           proc.kill()
 
-          // remove EOO from data (-4 because \n before and after EOO)
           const dataStr = data
             .toString("utf-8")
             .replaceAll("\r", "")
@@ -265,7 +264,7 @@ export class PyboardRunner extends EventEmitter {
 
           const resp: PyOutPortsScan = {
             type: PyOutType.portsScan,
-            ports: dataStr.split("\n"),
+            ports: dataStr !== "" ? dataStr.split("\n") : [],
           }
 
           resolve(resp)
@@ -506,6 +505,24 @@ export class PyboardRunner extends EventEmitter {
                         .replace("!!__SENTINEL__!!", ""),
                       "utf-8"
                     )
+                  } else if (data.includes(ERR)) {
+                    this.disconnect(true)
+
+                    if (follow) {
+                      follow(ERR)
+                      opResult = {
+                        type: PyOutType.commandResult,
+                        result: true,
+                      } as PyOutCommandResult
+                    } else {
+                      // return full buffer
+                      opResult = {
+                        type: PyOutType.commandWithResponse,
+                        response: cleanBuffer(this.outBuffer),
+                      } as PyOutCommandWithResponse
+                    }
+
+                    break
                   }
 
                   if (data.includes(EOO)) {
@@ -1540,7 +1557,24 @@ export class PyboardRunner extends EventEmitter {
   /**
    * Closes the current serial connection to the Pico
    */
-  public async disconnect(): Promise<void> {
+  public async disconnect(afterDisconnect: boolean = false): Promise<void> {
+    if (afterDisconnect) {
+      this.proc.kill()
+      this.pipeConnected = false
+
+      // resolve queue
+      this.operationOngoing = OperationType.exit
+
+      // each operation will imidiately resolve as operationOngoing is not set to none
+      this.operationQueue.forEach(op => {
+        this.emit(`${PyboardRunnerEvents.nextOperation}_${op}`)
+      })
+
+      this.operationOngoing = OperationType.none
+
+      return
+    }
+
     // TODO: maybe also remove all pending operations from the queue?
     await this.runCommand({ command: "exit", args: {} }, OperationType.exit)
 
