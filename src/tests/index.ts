@@ -12,7 +12,7 @@ import type {
 } from "../pyout.js"
 
 const pyboardRunner = new PyboardRunner(
-  "COM3",
+  "/dev/cu.usbmodem1101",
   (data: Buffer | undefined) => {
     if (data !== undefined) {
       console.log(`stderr: ${data?.toString()}`)
@@ -30,7 +30,7 @@ const pyboardRunner = new PyboardRunner(
     }
     console.debug("Done - exit")
   },
-  "python"
+  "python3"
 )
 
 function processStat(result: PyOut): void {
@@ -47,14 +47,29 @@ function processStat(result: PyOut): void {
 setTimeout(async () => {
   console.log("===== Adding all operations!")
 
-  const interval = setInterval(async () => {
+  await PyboardRunner.getPorts()
+
+  /*const interval = setInterval(async () => {
     if (pyboardRunner.isPipeConnected()) {
       console.log("Connected")
     } else {
       console.log("Not connected")
     }
     await pyboardRunner.checkStatus()
-  }, 2500)
+  }, 2500)*/
+  const data = await pyboardRunner.runFile(
+    "/Users/paulober/PicoDev/test/main.py",
+    (data: string) => {
+      if (data.includes("!!ERR!!")) {
+        console.log("IsPipeConnected: " + pyboardRunner.isPipeConnected())
+
+        return
+      }
+      console?.log(data)
+    }
+  )
+  console.log("Run file result: " + JSON.stringify(data))
+  exit(0)
 
   const result123 = await pyboardRunner.softReset()
   console.log("Soft reset result: " + JSON.stringify(result123))
@@ -143,8 +158,7 @@ process.on("SIGINT", () => {
   console.log("Caught interrupt signal")
   pyboardRunner.disconnect()
   process.exit()
-})
-;(async function () {
+}) /*(async function () {
   let i = 2
   while (i > 0) {
     await new Promise(resolve => setTimeout(resolve, 1000))
@@ -197,10 +211,10 @@ process.on("SIGINT", () => {
         const result = data as PyOutStatus
         console.log(`Download project status: ${result.status}`)
       }
-    })*/
+    })*/ /*
 
-    // Friendly command test
-    /*process.stdin.on("data", async (data: Buffer) => {
+// Friendly command test
+/*process.stdin.on("data", async (data: Buffer) => {
       await pyboardRunner.writeToPyboard(data.toString("utf-8"))
     })
     //"a='asd'\na\n",
@@ -218,7 +232,7 @@ process.on("SIGINT", () => {
           const result = data as PyOutCommandResult
           console.log(`Command result: ${result.result}`)
         }
-      })*/
+      })*/ /*
 
     pyboardRunner
       .runFile(
@@ -254,7 +268,7 @@ process.on("SIGINT", () => {
 
     pyboardRunner.listContents("/").then(listDataCp)
   }, 300)
-})()
+})()*/
 ;(async function () {
   while (true) {
     await new Promise(resolve => setTimeout(resolve, 1000))
