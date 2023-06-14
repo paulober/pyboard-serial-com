@@ -10,6 +10,7 @@ import type {
   PyOutListContents,
   PyOutPortsScan,
   PyOutRtcTime,
+  PyOutTabComp,
 } from "./pyout.js"
 import { PyOutType } from "./pyout.js"
 import type PyFileData from "./pyfileData.js"
@@ -529,6 +530,8 @@ export class PyboardRunner extends EventEmitter {
                   }
 
                   if (data.includes(EOO)) {
+                    const isTabComp =
+                      this.operationOngoing === OperationType.retrieveTabComp
                     // stop operation - trigger resolve at end of scope
                     this.operationOngoing = OperationType.none
 
@@ -548,11 +551,23 @@ export class PyboardRunner extends EventEmitter {
                         result: true,
                       } as PyOutCommandResult
                     } else {
-                      // return full buffer
-                      opResult = {
-                        type: PyOutType.commandWithResponse,
-                        response: cleanBuffer(this.outBuffer),
-                      } as PyOutCommandWithResponse
+                      if (isTabComp) {
+                        const cleanBuf = cleanBuffer(this.outBuffer)
+                        const isSimple = cleanBuf.includes(
+                          "!!SIMPLE_AUTO_COMP!!" // len =20
+                        )
+                        opResult = {
+                          type: PyOutType.tabComp,
+                          isSimple: isSimple,
+                          completion: isSimple ? cleanBuf.slice(20) : cleanBuf,
+                        } as PyOutTabComp
+                      } else {
+                        // return full buffer
+                        opResult = {
+                          type: PyOutType.commandWithResponse,
+                          response: cleanBuffer(this.outBuffer),
+                        } as PyOutCommandWithResponse
+                      }
                     }
                   } else {
                     // either keep in buffer or write into cb and clean buffer

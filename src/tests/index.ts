@@ -9,6 +9,7 @@ import type {
   PyOutGetItemStat,
   PyOutRtcTime,
   PyOutStatus,
+  PyOutTabComp,
 } from "../pyout.js"
 
 const pyboardRunner = new PyboardRunner(
@@ -77,9 +78,12 @@ setTimeout(async () => {
     console.log(`Command result: ${result.response}`)
   }
   data = await pyboardRunner.retrieveTabCompletion("uos.")
-  if (data.type === PyOutType.commandWithResponse) {
-    const result = data as PyOutCommandWithResponse
-    console.log(`Tab completion (before uos import): ${result.response}`)
+  if (data.type === PyOutType.tabComp) {
+    const result = data as PyOutTabComp
+    console.log(
+      `Tab completion (before uos import): IsSimple: ${result.isSimple} | ` +
+        result.completion
+    )
   }
   data = await pyboardRunner.executeCommand("import uos")
   if (data.type === PyOutType.commandWithResponse) {
@@ -87,9 +91,20 @@ setTimeout(async () => {
     console.log(`Command result: ${result.response}`)
   }
   data = await pyboardRunner.retrieveTabCompletion("uos.")
-  if (data.type === PyOutType.commandWithResponse) {
-    const result = data as PyOutCommandWithResponse
-    console.log(`Tab completion (after uos import): ${result.response}`)
+  if (data.type === PyOutType.tabComp) {
+    const result = data as PyOutTabComp
+    console.log(
+      `Tab completion (after uos import): IsSimple: ${result.isSimple} | ` +
+        result.completion
+    )
+  }
+  data = await pyboardRunner.retrieveTabCompletion("uos.l")
+  if (data.type === PyOutType.tabComp) {
+    const result = data as PyOutTabComp
+    console.log(
+      `Tab completion (for uos.l): IsSimple: ${result.isSimple} | ` +
+        result.completion
+    )
   }
   exit(0)
 

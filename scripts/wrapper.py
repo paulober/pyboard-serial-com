@@ -15,6 +15,7 @@ from typing import Optional, Union
 
 EOO = "!!EOO!!"  # End of operation
 ERR = "!!ERR!!"  # Error
+SIMPLE_AUTO_COMP = "!!SIMPLE_AUTO_COMP!!"  # Simple auto completion
 SUPPORTED_USB_PIDS: list[int] = [
     0x0005,  # Raspberry Pi Pico MicroPython firmware (CDC)
 ]
@@ -508,11 +509,15 @@ def hash_file(file):
         wrapper.pyb.serial.timeout = 0.1
         # send tab command
         wrapper.pyb.serial.write(b"\t")
-        # read own echoed back prompt (because of FRIENDLY mode)
-        val = wrapper.pyb.serial.read_until(expected=cmd_bin+b"\r\n")
-        if val is not None and len(val) > 0:
-            # > tab-completion available
-            # remove cmd + friendly prompt from output
+        # read until first newline (if its a simple autocompletion it will wait for the timeout)
+        val = wrapper.pyb.serial.read_until(expected=b"\r\n")
+        # +2 for newline and carriage return expected above | if no completion avail
+        # it will be returned as mutliline
+        if len(val) > len(cmd_bin)+2:
+            # > simple tab-completion available
+            sys.stdout.write(SIMPLE_AUTO_COMP+val.decode("utf-8")+"\n")
+        else:
+            # > multiline tab-completion available
             sys.stdout.write(wrapper.pyb.serial.read_until(expected=cmd_bin)[:-len(cmd_bin)-4].decode("utf-8"))
         # clear line so enter_raw_repl() will work
         wrapper.pyb.serial.write(b"\x03")

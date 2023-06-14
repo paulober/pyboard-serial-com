@@ -9,6 +9,7 @@ export enum PyOutType {
   status,
   getItemStat,
   getRtcTime,
+  tabComp,
 }
 
 export interface PyOut {
@@ -51,4 +52,16 @@ export interface PyOutGetItemStat extends PyOut {
 export interface PyOutRtcTime extends PyOut {
   type: PyOutType.getRtcTime
   time: Date | null
+}
+
+export interface PyOutTabComp extends PyOut {
+  type: PyOutType.tabComp
+  /**
+   * Simple completion is when there is only one completion option so the command
+   * extended with the completion will be returned, not only the completion.
+   *
+   * Also if it's simple it will not end with a newline.
+   */
+  isSimple: boolean
+  completion: string
 }
