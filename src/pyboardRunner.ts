@@ -51,12 +51,14 @@ enum OperationType {
   getRtcTime,
   exit,
   checkStatus,
+  retrieveTabComp,
 }
 
 type Command = {
   command:
     | "command"
     | "friendly_code"
+    | "retrieve_tab_comp"
     | "run_file"
     | "double_ctrlc"
     | "list_contents"
@@ -476,13 +478,14 @@ export class PyboardRunner extends EventEmitter {
             ) {
               let opResult: PyOut = { type: PyOutType.none } as PyOut
 
-              //console.debug(`stdout: ${this.outBuffer.toString('utf-8')}`)
+              //console.debug(`stdout: ${this.outBuffer.toString("utf-8")}`)
               switch (this.operationOngoing) {
                 // moved out
                 //case OperationType.scanPorts:
 
                 case OperationType.command:
                 case OperationType.friendlyCommand:
+                case OperationType.retrieveTabComp:
                 case OperationType.runFile:
                   // workaround because stdin.readline in wrapper.py is not terminatable
                   // and wrapper.py cannot write in its own stdin __SENTINEL__ requests
@@ -1047,6 +1050,28 @@ export class PyboardRunner extends EventEmitter {
       },
       OperationType.friendlyCommand,
       follow
+    )
+  }
+
+  /**
+   * Retrieve tab-completion result from remote REPL.
+   *
+   * @param line The line to get tab completion for
+   * @returns PyOutWithCommandResponse object
+   */
+  public async retrieveTabCompletion(line: string): Promise<PyOut> {
+    if (!this.pipeConnected) {
+      return { type: PyOutType.none }
+    }
+
+    return this.runCommand(
+      {
+        command: "retrieve_tab_comp",
+        args: {
+          code: line,
+        },
+      },
+      OperationType.retrieveTabComp
     )
   }
 

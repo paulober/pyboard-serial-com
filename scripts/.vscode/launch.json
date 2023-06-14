@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "wrapper.py",
             "args": [
-                "-d", "COM3",
+                "-d", "/dev/cu.usbmodem1101",
                 "-b", "115200"
             ],
             "cwd": "${workspaceFolder}",

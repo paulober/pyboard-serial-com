@@ -492,6 +492,35 @@ def hash_file(file):
         # ctrl-C twice: interrupt any running program
         self.pyb.serial.write(b"\r\x03\x03")
 
+    def retrieve_tab_completion(self, line: str):
+        cmd_bin = line.encode("utf-8")
+        wrapper.pyb.serial.write(b"\x02")
+        wrapper.pyb.serial.flush()
+        # normally friendly repl prompt needs about 0.00007s to arrive (at worst)
+        time.sleep(0.002)
+        # throw friendly REPL prompt in the void
+        wrapper.pyb.serial.reset_input_buffer()
+        # send cmd
+        wrapper.pyb.serial.write(cmd_bin)
+        # reconfigure serial port timeout (and store current timeout value)
+        # timeout needed because otherwise read_until() will block forever (if no tab-completion is available)
+        prev_timeout = wrapper.pyb.serial.timeout
+        wrapper.pyb.serial.timeout = 0.1
+        # send tab command
+        wrapper.pyb.serial.write(b"\t")
+        # read own echoed back prompt (because of FRIENDLY mode)
+        val = wrapper.pyb.serial.read_until(expected=cmd_bin+b"\r\n")
+        if val is not None and len(val) > 0:
+            # > tab-completion available
+            # remove cmd + friendly prompt from output
+            sys.stdout.write(wrapper.pyb.serial.read_until(expected=cmd_bin)[:-len(cmd_bin)-4].decode("utf-8"))
+        # clear line so enter_raw_repl() will work
+        wrapper.pyb.serial.write(b"\x03")
+        # put REPl back into raw mode
+        wrapper.enter_raw_repl(False)
+        # restore previous timeout
+        wrapper.pyb.serial.timeout = prev_timeout
+
 
 # Define the serial port reading function
 def read_serial_port(stop_event: threading.Event):
@@ -687,6 +716,9 @@ if __name__ == "__main__":
                 wrapper.exec_friendly_cmd(line["args"]["code"])
                 # clear full stdin buffer
                 clear_stdin()
+
+            elif line["command"] == "retrieve_tab_comp" and "code" in line["args"]:
+                wrapper.retrieve_tab_completion(line["args"]["code"])
 
             elif line["command"] == "run_file" and "files" in line["args"]:
                 wrapper.run_file(line["args"]["files"][0])

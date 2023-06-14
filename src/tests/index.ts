@@ -47,7 +47,7 @@ function processStat(result: PyOut): void {
 setTimeout(async () => {
   console.log("===== Adding all operations!")
 
-  await PyboardRunner.getPorts()
+  //await PyboardRunner.getPorts()
 
   /*const interval = setInterval(async () => {
     if (pyboardRunner.isPipeConnected()) {
@@ -57,7 +57,7 @@ setTimeout(async () => {
     }
     await pyboardRunner.checkStatus()
   }, 2500)*/
-  const data = await pyboardRunner.runFile(
+  /*let data = await pyboardRunner.runFile(
     "/Users/paulober/PicoDev/test/main.py",
     (data: string) => {
       if (data.includes("!!ERR!!")) {
@@ -68,7 +68,29 @@ setTimeout(async () => {
       console?.log(data)
     }
   )
-  console.log("Run file result: " + JSON.stringify(data))
+  console.log("Run file result: " + JSON.stringify(data))*/
+  let data = await pyboardRunner.executeCommand(
+    "print('Hello world!'+str(1+2))"
+  )
+  if (data.type === PyOutType.commandWithResponse) {
+    const result = data as PyOutCommandWithResponse
+    console.log(`Command result: ${result.response}`)
+  }
+  data = await pyboardRunner.retrieveTabCompletion("uos.")
+  if (data.type === PyOutType.commandWithResponse) {
+    const result = data as PyOutCommandWithResponse
+    console.log(`Tab completion (before uos import): ${result.response}`)
+  }
+  data = await pyboardRunner.executeCommand("import uos")
+  if (data.type === PyOutType.commandWithResponse) {
+    const result = data as PyOutCommandWithResponse
+    console.log(`Command result: ${result.response}`)
+  }
+  data = await pyboardRunner.retrieveTabCompletion("uos.")
+  if (data.type === PyOutType.commandWithResponse) {
+    const result = data as PyOutCommandWithResponse
+    console.log(`Tab completion (after uos import): ${result.response}`)
+  }
   exit(0)
 
   const result123 = await pyboardRunner.softReset()
