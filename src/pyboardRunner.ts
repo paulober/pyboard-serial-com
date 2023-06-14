@@ -559,7 +559,9 @@ export class PyboardRunner extends EventEmitter {
                         opResult = {
                           type: PyOutType.tabComp,
                           isSimple: isSimple,
-                          completion: isSimple ? cleanBuf.slice(20) : cleanBuf,
+                          completion: isSimple
+                            ? cleanBuf.slice(20).replace("\n", "")
+                            : cleanBuf,
                         } as PyOutTabComp
                       } else {
                         // return full buffer
