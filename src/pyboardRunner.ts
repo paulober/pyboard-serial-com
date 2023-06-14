@@ -443,6 +443,9 @@ export class PyboardRunner extends EventEmitter {
         if (this.operationOngoing === OperationType.exit) {
           this.operationOngoing = OperationType.none
           resolve({ type: PyOutType.none } as PyOut)
+        } else if (follow) {
+          // give the callbacks a hint that the operation is now starting
+          follow("")
         }
 
         if (errOccured) {
