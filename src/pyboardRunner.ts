@@ -1421,7 +1421,12 @@ export class PyboardRunner extends EventEmitter {
     // redundant as downloadFiles in wrapper also does this
     //await createFolderStructure(filePaths, projectRoot)
 
-    return this.downloadFiles(filePaths, projectRoot, follow)
+    return this.downloadFiles(
+      filePaths,
+      // if only one file is downloaded pyboard treats the target directory as target file
+      filePaths.length > 1 ? projectRoot : projectRoot + filePaths[0],
+      follow
+    )
   }
 
   /**
