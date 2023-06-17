@@ -338,28 +338,29 @@ class Wrapper:
 import uhashlib
 import ubinascii
 import uos
+import ujson
 
 def hash_file(file):
     try:
         if uos.stat(file)[6] > 200 * 1024:
-            print(f'{{"file": "{file}", "error": "File too large"}}')
+            print(ujson.dumps({"file": file, "error": "File too large"}))
             return
         with open(file, 'rb') as f:
             h = uhashlib.sha256()
             while True:
-                data = f.read(1024)
+                data = f.read(512)
                 if not data:
                     break
                 h.update(data)
-            print(f'{{"file": "{file}", "hash": "{ubinascii.hexlify(h.digest()).decode()}"}}')
+            print(ujson.dumps({"file": file, "hash": ubinascii.hexlify(h.digest()).decode()}))
     except Exception as e:
-        print(f'{{"file": "{file}", "error": "{e.__class__.__name__}: {e}"}}')
+        print(ujson.dumps({"file": file, "error": f"{e.__class__.__name__}: {e}"}))
 """
         # load function in ram on the pyboard
         self.exec_cmd(hashes_script, False)
         # call function for each file
         for file in files:
-            self.exec_cmd(f"hash_file('{file}')")
+            self.exec_cmd(f"hash_file('{file}'); del hash_file")
 
     def rename_item(self, old: str, new: str):
         """Renames a file / folder on the Pico (W).
