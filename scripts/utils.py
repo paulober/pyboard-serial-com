@@ -30,3 +30,22 @@ def wrap_expressions_with_print(code):
     except Exception:
         return code
 
+
+def prepend_parent_directories(folders: list[str]) -> list[str]:
+    """
+    aka mkdir -p for each folder in folders
+
+    :param folders: list of folders to create recursively
+
+    Note: this function does not create the folders, it just returns the list of folders to create with parents first
+    """
+    parent_dirs = set()  # Use a set to avoid duplicates
+    for folder in folders:
+        components = folder.split("/")
+        path = ""
+        for component in components:
+            if component:
+                path += "/" + component.lstrip("/")
+                parent_dirs.add(path)
+    sorted_dirs = sorted(parent_dirs)
+    return sorted_dirs

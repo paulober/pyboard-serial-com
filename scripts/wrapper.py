@@ -5,7 +5,7 @@ import json
 import pyboard as pyboard
 import mpyFunctions
 import ast
-from utils import create_folder_structure, wrap_expressions_with_print
+from utils import create_folder_structure, wrap_expressions_with_print, prepend_parent_directories
 import threading
 import time
 import signal
@@ -283,6 +283,7 @@ class Wrapper:
             folders (list[str]): The path to the folder(s) to create on the remote host.
         """
         # call mkdir for each folder
+        folders = prepend_parent_directories(folders)
         for folder in folders:
             pyboard.filesystem_command(self.pyb, ["mkdir", folder])
 
