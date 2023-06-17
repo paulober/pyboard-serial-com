@@ -679,29 +679,37 @@ export class PyboardRunner extends EventEmitter {
                       fsOpsProgress++
                       break
                     } else {
-                      const progData: ProgressData = JSON.parse(jsonString)
+                      try {
+                        const progData: ProgressData = JSON.parse(jsonString)
 
-                      const { written, total } = progData
+                        const { written, total } = progData
 
-                      if (previousProgress === undefined) {
+                        if (previousProgress === undefined) {
+                          previousProgress = progData
+                        } else if (
+                          previousProgress?.written > written ||
+                          previousProgress?.total !== total
+                        ) {
+                          fsOpsProgress++
+                        }
+
+                        const progress = Math.round((written / total) * 100)
+
+                        follow?.(
+                          `${command.args.files?.[fsOpsProgress]}: ${progress}%`
+                        )
+
                         previousProgress = progData
-                      } else if (
-                        previousProgress?.written > written ||
-                        previousProgress?.total !== total
-                      ) {
-                        fsOpsProgress++
+
+                        // clean-up buffer as current progress is not needed anymore
+                        break
+                      } catch (e) {
+                        console.error(
+                          "[pyboard-serial-com]: Error parsing JSON: ",
+                          e
+                        )
+                        break
                       }
-
-                      const progress = Math.round((written / total) * 100)
-
-                      follow?.(
-                        `${command.args.files?.[fsOpsProgress]}: ${progress}%`
-                      )
-
-                      previousProgress = progData
-
-                      // clean-up buffer as current progress is not needed anymore
-                      break
                     }
                   }
 
@@ -726,10 +734,17 @@ export class PyboardRunner extends EventEmitter {
                       }
 
                       if (!line.includes("error") && !line.includes(ERR)) {
-                        const result = JSON.parse(
-                          line.trim().replaceAll("\r", "")
-                        )
-                        this.remoteFileHashes.set(result.file, result.hash)
+                        try {
+                          const result = JSON.parse(
+                            line.trim().replaceAll("\r", "")
+                          )
+                          this.remoteFileHashes.set(result.file, result.hash)
+                        } catch (e) {
+                          console.debug(
+                            "[pyboard-serial-com]: Error parsing JSON: ",
+                            e
+                          )
+                        }
                       } else {
                         console.debug(
                           "File not found or other error," +
