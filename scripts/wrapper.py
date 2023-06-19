@@ -94,11 +94,15 @@ def get_directories_to_create(file_paths):
 fsop_current_file_pos = -1
 fsop_total_files_count = -1
 def fs_progress_callback(written: int, total: int):
+    """
+    Needs to be very fast, otherwise multiple json dumps could arrive at the same time at the parent process if files are small.
+    """
     payload = { "written": written, "total": total }
     if fsop_current_file_pos != -1 and fsop_total_files_count >= fsop_current_file_pos:
         payload["currentFilePos"] = fsop_current_file_pos
         payload["totalFilesCount"] = fsop_total_files_count
-    print(json.dumps(payload), flush=True)
+    # json.dumps not needed, improves performance by reducing overhead
+    print(payload, flush=True)
 
 
 if platform.system() == "Windows":

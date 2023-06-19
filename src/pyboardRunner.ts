@@ -758,8 +758,8 @@ export class PyboardRunner extends EventEmitter {
                         }
                       } else {
                         console.debug(
-                          "File not found or other error," +
-                            " like to big to calc hash for"
+                          "[pyboard-serial-com] File not found (or other " +
+                            "error, like to big to calc hash for)"
                         )
                       }
                     }
