@@ -1,6 +1,6 @@
 {
   "name": "@paulober/pyboard-serial-com",
-  "version": "1.4.31",
+  "version": "1.4.32",
   "description": "A simple library to communicate with the pyboard.py tool over serialport.",
   "module": "./dist/index.mjs",
   "type": "module",

@@ -459,6 +459,8 @@ export class PyboardRunner extends EventEmitter {
           type ProgressData = {
             written: number
             total: number
+            currentFilePos: number
+            totalFilesCount: number
           }
 
           let previousProgress: ProgressData | undefined
@@ -682,7 +684,12 @@ export class PyboardRunner extends EventEmitter {
                       try {
                         const progData: ProgressData = JSON.parse(jsonString)
 
-                        const { written, total } = progData
+                        const {
+                          written,
+                          total,
+                          currentFilePos,
+                          totalFilesCount,
+                        } = progData
 
                         if (previousProgress === undefined) {
                           previousProgress = progData
@@ -696,7 +703,9 @@ export class PyboardRunner extends EventEmitter {
                         const progress = Math.round((written / total) * 100)
 
                         follow?.(
-                          `${command.args.files?.[fsOpsProgress]}: ${progress}%`
+                          `'${command.args.files?.[fsOpsProgress]}' ` +
+                            `[${currentFilePos}/${totalFilesCount}]: ` +
+                            `${progress}%`
                         )
 
                         previousProgress = progData

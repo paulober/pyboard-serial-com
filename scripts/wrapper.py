@@ -91,8 +91,14 @@ def get_directories_to_create(file_paths):
         yield (file_path, dir)
 
 
+fsop_current_file_pos = -1
+fsop_total_files_count = -1
 def fs_progress_callback(written: int, total: int):
-    print(f"{{\"written\": {written}, \"total\": {total}}}", flush=True)
+    payload = { "written": written, "total": total }
+    if fsop_current_file_pos != -1 and fsop_total_files_count >= fsop_current_file_pos:
+        payload["currentFilePos"] = fsop_current_file_pos
+        payload["totalFilesCount"] = fsop_total_files_count
+    print(json.dumps(payload), flush=True)
 
 
 if platform.system() == "Windows":
@@ -175,12 +181,14 @@ class Wrapper:
         pyboard.filesystem_command(self.pyb, ["ls_recursive", folder])
 
     def upload_files(self, local: list[str], remote: str = None, local_base_dir: str = None, verbose: bool = False):
-        """Uploads (a) file(s) to the pico.
+        """Upload files to the Pico.
 
         Args:
-            local (str): The local path to the file(s) to upload splited by a single space.
-            remote (str): The remote path to save the file to or folder to save files to.
+            local (list[str]): The local paths to the files to upload.
+            remote (str): The remote path to save the files relative to.
         """
+        global fsop_current_file_pos, fsop_total_files_count
+        
         if remote == None or remote == "":
             remote = ":"
 
@@ -196,6 +204,7 @@ class Wrapper:
                 os.makedirs(dir_path)
             custom_copy(files, dir_path)
         """
+        fsop_total_files_count = len(local)
 
         if local_base_dir != None:
             # copy one by one; all files must be in a child directory of local_base_dir!!
@@ -212,6 +221,7 @@ class Wrapper:
                 # treat remote as directory and not as a target file name if it ends with a slash
                 # remote + dir_path because dir_path is relative to the remote path
                 if verbose:
+                    fsop_current_file_pos = destinations.index(dest) + 1
                     pyboard.filesystem_command(
                         self.pyb, ["cp", dest[0], remote+dir_path+"/"],
                         progress_callback=fs_progress_callback)
@@ -220,10 +230,13 @@ class Wrapper:
                         self.pyb, ["cp", dest[0], remote+dir_path+"/"])
         else:
             if verbose:
+                fsop_current_file_pos = destinations.index(dest)
                 pyboard.filesystem_command(
                     self.pyb, ["cp"]+local+[remote], progress_callback=fs_progress_callback)
             else:
                 pyboard.filesystem_command(self.pyb, ["cp"]+local+[remote])
+        fsop_total_files_count = -1
+        fsop_current_file_pos = -1
 
     def download_files(self, remote: list[str], local: str, verbose: bool = False):
         """Downloads (a) files from the pico.
@@ -232,6 +245,9 @@ class Wrapper:
             remote (str): The remote path to the file(s) to download splited by single space.
             local (str): The local path to save the file to or folder to save files to.
         """
+        global fsop_current_file_pos, fsop_total_files_count
+
+        fsop_total_files_count = len(remote)
 
         if len(remote) > 1:
             create_folder_structure(remote, local)
@@ -249,8 +265,10 @@ class Wrapper:
                 folder_path, _ = file_path.rsplit('/', 1)
                 folder_files[folder_path].append(file_path)
 
+            fsop_current_file_pos = 0
             # Call pyboard.filesystem_command for each folder and its files
             for folder_path, files in folder_files.items():
+                fsop_current_file_pos += 1
                 # if local is a directory, add a slash to the end, because see above
                 target = os.path.join(local, folder_path.lstrip(
                     ':').lstrip('/'))+os.path.sep
@@ -261,10 +279,13 @@ class Wrapper:
                     pyboard.filesystem_command(self.pyb, ["cp"] + files + [target])
         else:
             if verbose:
+                fsop_current_file_pos = 1
                 pyboard.filesystem_command(
                     self.pyb, ["cp"]+remote+[local], progress_callback=fs_progress_callback)
             else:
                 pyboard.filesystem_command(self.pyb, ["cp"]+remote+[local])
+        fsop_total_files_count = -1
+        fsop_current_file_pos = -1
 
     def delete_files(self, files: list[str]):
         """Deletes (a) file(s) on the pico.
