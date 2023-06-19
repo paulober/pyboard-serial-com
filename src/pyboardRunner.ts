@@ -714,7 +714,9 @@ export class PyboardRunner extends EventEmitter {
                         break
                       } catch (e) {
                         console.error(
-                          "[pyboard-serial-com]: Error parsing JSON: ",
+                          "[pyboard-serial-com]: Error parsing JSON: JSON:(",
+                          jsonString,
+                          ") Error:",
                           e
                         )
                         break
