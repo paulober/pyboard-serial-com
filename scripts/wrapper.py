@@ -94,6 +94,9 @@ def get_directories_to_create(file_paths):
 fsop_current_file_pos = -1
 fsop_total_files_count = -1
 def fs_progress_callback(written: int, total: int):
+    if written == -1 and total == -1:
+        global fsop_current_file_pos
+        fsop_current_file_pos += 1
     """
     Needs to be very fast, otherwise multiple json dumps could arrive at the same time at the parent process if files are small.
     """
@@ -233,9 +236,8 @@ class Wrapper:
                         self.pyb, ["cp", dest[0], remote+dir_path+"/"])
         else:
             if verbose:
-                fsop_current_file_pos = destinations.index(dest)
                 pyboard.filesystem_command(
-                    self.pyb, ["cp"]+local+[remote], progress_callback=fs_progress_callback)
+                    self.pyb, ["cp"]+local+[remote], progress_callback=fs_progress_callback, auto_pos_incr=True)
             else:
                 pyboard.filesystem_command(self.pyb, ["cp"]+local+[remote])
         fsop_total_files_count = -1
@@ -261,7 +263,7 @@ class Wrapper:
             if local[-1] != os.path.sep:
                 local += os.path.sep
 
-            folder_files = defaultdict(list)
+            folder_files: dict[str: list[str]] = defaultdict(list)
 
             # Group files by folder
             for file_path in remote:
@@ -271,20 +273,18 @@ class Wrapper:
             fsop_current_file_pos = 0
             # Call pyboard.filesystem_command for each folder and its files
             for folder_path, files in folder_files.items():
-                fsop_current_file_pos += 1
                 # if local is a directory, add a slash to the end, because see above
                 target = os.path.join(local, folder_path.lstrip(
                     ':').lstrip('/'))+os.path.sep
                 if verbose:
                     pyboard.filesystem_command(
-                        self.pyb, ["cp"] + files + [target], progress_callback=fs_progress_callback)
+                        self.pyb, ["cp"] + files + [target], progress_callback=fs_progress_callback, auto_pos_incr=True)
                 else:
                     pyboard.filesystem_command(self.pyb, ["cp"] + files + [target])
         else:
             if verbose:
-                fsop_current_file_pos = 1
                 pyboard.filesystem_command(
-                    self.pyb, ["cp"]+remote+[local], progress_callback=fs_progress_callback)
+                    self.pyb, ["cp"]+remote+[local], progress_callback=fs_progress_callback, auto_pos_incr=True)
             else:
                 pyboard.filesystem_command(self.pyb, ["cp"]+remote+[local])
         fsop_total_files_count = -1

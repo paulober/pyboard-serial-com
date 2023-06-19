@@ -731,7 +731,10 @@ def execfile(filename, device="/dev/ttyACM0", baudrate=115200, user="micro", pas
     pyb.close()
 
 
-def filesystem_command(pyb, args, progress_callback=None, verbose=False):
+# EDITED by paulober
+# added auto_pos_incr parameter
+# END edit
+def filesystem_command(pyb, args, progress_callback=None, verbose=False, auto_pos_incr=False):
     def fname_remote(src):
         if src.startswith(":"):
             src = src[1:]
@@ -766,8 +769,16 @@ def filesystem_command(pyb, args, progress_callback=None, verbose=False):
                     print("cp %s %s" % (src, dest))
                 if src.startswith(":"):
                     op = op_remote_src
+                    # EDITED by paulober
+                    if auto_pos_incr and progress_callback:
+                        progress_callback(-1, -1)
+                    # END edited part
                 else:
                     op = op_local_src
+                    # EDITED by paulober
+                    if auto_pos_incr and progress_callback:
+                        progress_callback(-1, -1)
+                    # END edited part
                 src2 = fname_remote(src)
                 dest2 = fname_cp_dest(src2, fname_remote(dest))
                 op(src2, dest2, progress_callback=progress_callback)
