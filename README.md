@@ -14,7 +14,7 @@ Or add this package to your `package.json` file:
 
 ```json
 "dependencies": {
-    "@paulober/pyboard-serial-com": "1.5.0"
+    "@paulober/pyboard-serial-com": "1.5.1"
 }
 ```
 
