@@ -18,6 +18,20 @@
             "justMyCode": true
         },
         {
+            "name": "Python: Wrapper [listen]",
+            "type": "python",
+            "request": "launch",
+            "program": "wrapper.py",
+            "args": [
+                "-d", "/dev/cu.usbmodem1101",
+                "-b", "115200",
+                "--listen"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
             "name": "Python: Pyboard",
             "type": "python",
             "request": "launch",

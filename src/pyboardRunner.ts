@@ -53,6 +53,7 @@ enum OperationType {
   exit,
   checkStatus,
   retrieveTabComp,
+  ctrlD,
 }
 
 type Command = {
@@ -80,6 +81,7 @@ type Command = {
     | "status"
     | "soft_reset"
     | "hard_reset"
+    | "ctrl_d"
   args: {
     command?: string
     code?: string
@@ -149,6 +151,7 @@ export class PyboardRunner extends EventEmitter {
   private projectRoot: string = ""
   private remoteFileHashes: Map<string, string> = new Map()
   private hardResetResolve?: (data: PyOut) => void
+  private followHardReset?: (data: string) => void
 
   /**
    * Auto-connects to the serial port provided.
@@ -163,7 +166,7 @@ export class PyboardRunner extends EventEmitter {
    * For example: "python" on Windows or "python3" on Linux
    */
   constructor(
-    device: string = "defualt",
+    device: string = "default",
     err: (data: Buffer | undefined) => void,
     exit: (code: number, signal: string) => void,
     pythonExe: string = "default"
@@ -281,16 +284,26 @@ export class PyboardRunner extends EventEmitter {
   /**
    * Duplicate of the constructor!
    */
-  private spawnNewProcess(): void {
-    this.proc = spawn(
-      this.pythonExe,
-      [PyboardRunner.wrapperPyPath, "-d", this.device, "-b", "115200"],
-      {
-        stdio: "pipe",
-        windowsHide: true,
-        cwd: getScriptsRoot(),
-      }
-    )
+  private spawnNewProcess(listen = false): void {
+    const launchArgs = [
+      PyboardRunner.wrapperPyPath,
+      "-d",
+      this.device,
+      "-b",
+      "115200",
+    ]
+    if (listen && this.followHardReset) {
+      // to avoid Waiting seconds prompt, until device gets available
+      //launchArgs.push("--delay")
+      //launchArgs.push("0.5")
+      launchArgs.push("--listen")
+    }
+
+    this.proc = spawn(this.pythonExe, launchArgs, {
+      stdio: "pipe",
+      windowsHide: true,
+      cwd: getScriptsRoot(),
+    })
 
     // Set the encoding for the subprocess stdin.
     this.proc.stdin.setDefaultEncoding("utf-8")
@@ -308,6 +321,29 @@ export class PyboardRunner extends EventEmitter {
 
       this.pipeConnected = true
       console.debug("Spawned")
+
+      if (listen && this.followHardReset) {
+        this.proc.stdout.on("data", (data: Buffer) => {
+          if (
+            data.length === 0 ||
+            (data.includes("Waiting") && data.includes("seconds for pyboard"))
+          ) {
+            return
+          }
+
+          if (data.includes(EOO)) {
+            this.proc.stdout.removeAllListeners("data")
+            const dataStr = data.toString("utf-8").replace(EOO, "")
+            if (this.followHardReset) {
+              this.followHardReset(dataStr)
+            }
+            this.followHardReset = undefined
+            this.resolveHardReset()
+          } else if (this.followHardReset) {
+            this.followHardReset(data.toString("utf-8"))
+          }
+        })
+      }
 
       this.err(undefined)
     })
@@ -372,17 +408,24 @@ export class PyboardRunner extends EventEmitter {
       }
       this.exit(code, signal)
     } else {
-      this.spawnNewProcess()
-      if (this.hardResetResolve) {
-        this.operationOngoing = OperationType.none
-        this.hardResetResolve({
-          type: PyOutType.commandResult,
-          result: true,
-        } as PyOutCommandResult)
-        this.hardResetResolve = undefined
-        this.processNextOperation()
+      // on reset exit
+      this.spawnNewProcess(this.followHardReset !== undefined)
+      if (this.hardResetResolve && this.followHardReset === undefined) {
+        this.resolveHardReset()
       }
     }
+  }
+
+  private resolveHardReset(): void {
+    this.operationOngoing = OperationType.none
+    if (this.hardResetResolve !== undefined) {
+      this.hardResetResolve({
+        type: PyOutType.commandResult,
+        result: true,
+      } as PyOutCommandResult)
+    }
+    this.hardResetResolve = undefined
+    this.processNextOperation()
   }
 
   private onClose(): void {
@@ -432,6 +475,7 @@ export class PyboardRunner extends EventEmitter {
         if (command.command === "hard_reset") {
           // save for delayed resolve
           this.hardResetResolve = resolve
+          this.followHardReset = follow
         }
 
         // start operation
@@ -489,6 +533,7 @@ export class PyboardRunner extends EventEmitter {
                 case OperationType.friendlyCommand:
                 case OperationType.retrieveTabComp:
                 case OperationType.runFile:
+                case OperationType.ctrlD:
                   // workaround because stdin.readline in wrapper.py is not terminatable
                   // and wrapper.py cannot write in its own stdin __SENTINEL__ requests
                   // us to do this
@@ -1597,12 +1642,11 @@ export class PyboardRunner extends EventEmitter {
   /**
    * Performs a hard reset on the Pico
    *
-   * @param verbose Currently not supported
-   * @returns PyOut of type none or
-   * PyOutCommandResult (verbose=false) or PyOutCommandWithResponse (verbose=true)
+   * @param follow Listen to boot output (experimental, don't use if script isn't
+   * running for a time and if it doesn't sends output to the repl)
+   * @returns PyOut of type none or PyOutCommandResult
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  public async hardReset(verbose: boolean = false): Promise<PyOut> {
+  public async hardReset(follow?: (data: string) => void): Promise<PyOut> {
     if (!this.pipeConnected) {
       return { type: PyOutType.none }
     }
@@ -1612,7 +1656,30 @@ export class PyboardRunner extends EventEmitter {
         command: "hard_reset",
         args: {},
       },
-      OperationType.reset
+      OperationType.reset,
+      follow
+    )
+  }
+
+  /**
+   * Sends a ctrl+d to the Pico and follows the output.
+   * (it's like soft reset but it also reruns main and boot)
+   *
+   * @param follow Listen the main.py and boot.py output
+   * @returns PyOut of type none or PyOutCommandResult
+   */
+  public async sendCtrlD(follow: (data: string) => void): Promise<PyOut> {
+    if (!this.pipeConnected) {
+      return { type: PyOutType.none }
+    }
+
+    return this.runCommand(
+      {
+        command: "ctrl_d",
+        args: {},
+      },
+      OperationType.ctrlD,
+      follow
     )
   }
 

@@ -507,7 +507,7 @@ def hash_file(file):
         Reboots the pyboard.
         """
         self.stop_running_stuff()
-        cmd = "\rimport machine; machine.reset()"
+        cmd = "\rimport machine as _pico_machine; _pico_machine.reset()"
         # verbose does not work
         if verbose:
             self.pyb.exec(cmd, data_consumer=pyboard.stdout_write_bytes,
@@ -526,6 +526,27 @@ def hash_file(file):
         self.pyb.exit_raw_repl()
         self.pyb.enter_raw_repl(True)
         time.sleep(0.1)
+
+    def ctrl_d(self):
+        """
+        Sends ctrl-c to the pyboard.
+        """
+        self.pyb.exit_raw_repl()
+        time.sleep(0.02)
+        self.pyb.serial.read_all()
+
+        stop_event = threading.Event()
+        stdio_thread = threading.Thread(target=redirect_stdin, args=(stop_event, self,))
+        stdio_thread.daemon = True
+        stdio_thread.start()
+    
+        self.pyb.serial.write(b"\r\x04")
+        self.listen_until_friendly_prompt(timeout=50)
+        stop_event.set()
+        self.enter_raw_repl(False)
+        sys.stdout.write("!!__SENTINEL__!!")
+        sys.stdout.flush()
+        stdio_thread.join()
 
     def stop_running_stuff(self):
         # ctrl-C twice: interrupt any running program
@@ -563,6 +584,24 @@ def hash_file(file):
         wrapper.enter_raw_repl(False)
         # restore previous timeout
         wrapper.pyb.serial.timeout = prev_timeout
+
+    def listen_until_friendly_prompt(self, timeout: float = 2):
+        received_data = ""
+        start_time = time.time()
+
+        while True:
+            received_data = wrapper.pyb.serial.read(wrapper.pyb.serial.inWaiting()).decode("utf-8")
+
+            if "\n>>> " in received_data:
+                print(received_data.removesuffix(">>> "), end="")
+                break
+            elif len(received_data) > 0:
+                # reset timeout
+                start_time = time.time()
+                print(received_data, end="", flush=True)
+
+            if timeout > 0 and time.time()-start_time > timeout:
+                break
 
 
 # Define the serial port reading function
@@ -637,6 +676,17 @@ if __name__ == "__main__":
         action="store_true",
         dest="friendly",
     )
+    cmd_parser.add_argument(
+        "-dl",
+        "--delay",
+        default=0.0,
+        help="delay in seconds before connecting",
+    )
+    cmd_parser.add_argument(
+        "--listen",
+        action="store_true",
+        dest="listen",
+    )
 
     args = cmd_parser.parse_args()
 
@@ -657,10 +707,24 @@ if __name__ == "__main__":
         if args.device == "default":
             sys.exit(0x12F9)
 
+        if args.delay:
+            time.sleep(float(args.delay))
+
         wrapper = Wrapper(args.device, args.baudrate)
 
         # register a signal handler to responsible close the os handle for the port
         signal.signal(signal.SIGINT, lambda s, f: wrapper.disconnect())
+
+        if args.listen:
+            stop_event = threading.Event()
+            stdio_thread = threading.Thread(target=redirect_stdin, args=(stop_event, wrapper,))
+            stdio_thread.daemon = True
+            stdio_thread.start()
+            wrapper.listen_until_friendly_prompt(timeout=-1)
+            stop_event.set()
+            stdio_thread.join()
+            print(EOO, flush=True)
+
 
         # enter raw repl (better for programmatic use, aka bot chating with bot)
         wrapper.enter_raw_repl(True)
@@ -743,7 +807,12 @@ if __name__ == "__main__":
             elif line["command"] == "soft_reset":
                 wrapper.soft_reset()
 
+            elif line["command"] == "ctrl_d":
+                wrapper.ctrl_d()
+
             elif line["command"] == "hard_reset":
+                if "verbose" in line["args"] and line["args"]["verbose"]:
+                    wrapper.reboot(verbose=True)
                 wrapper.reboot()
 
             elif line["command"] == "command" and "command" in line["args"]:
