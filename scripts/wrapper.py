@@ -97,6 +97,7 @@ def fs_progress_callback(written: int, total: int):
     if written == -1 and total == -1:
         global fsop_current_file_pos
         fsop_current_file_pos += 1
+        return
     """
     Needs to be very fast, otherwise multiple json dumps could arrive at the same time at the parent process if files are small.
     """
