@@ -520,7 +520,8 @@ export class PyboardRunner extends EventEmitter {
               this.operationOngoing === OperationType.friendlyCommand ||
               (this.operationOngoing === OperationType.command &&
                 command.args.interactive) ||
-              this.operationOngoing === OperationType.runFile
+              this.operationOngoing === OperationType.runFile ||
+              this.operationOngoing === OperationType.ctrlD
             ) {
               let opResult: PyOut = { type: PyOutType.none } as PyOut
 

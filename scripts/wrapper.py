@@ -603,6 +603,29 @@ def hash_file(file):
             if timeout > 0 and time.time()-start_time > timeout:
                 break
 
+    def listen_until_friendly_prompt_into_stdout(self, timeout: float = 2):
+        received_data: bytes | None = None
+        start_time = time.time()
+
+        while True:
+            received_data = wrapper.pyb.serial.read(wrapper.pyb.serial.inWaiting())
+
+            if received_data is not None: 
+                if b"\n>>> " in received_data:
+                    #print(received_data.removesuffix(">>> "), end="")
+                    sys.stdout.buffer.write(received_data.removesuffix(b">>> "))
+                    sys.stdout.buffer.flush()
+                    break
+                elif len(received_data) > 0:
+                    # reset timeout
+                    start_time = time.time()
+                    #print(received_data, end="", flush=True)
+                    sys.stdout.buffer.write(received_data)
+                    sys.stdout.buffer.flush()
+
+            if timeout > 0 and time.time()-start_time > timeout:
+                break
+
 
 # Define the serial port reading function
 def read_serial_port(stop_event: threading.Event):
