@@ -454,16 +454,12 @@ export class PyboardRunner extends EventEmitter {
           this.processNextOperation()
           resolve({ type: PyOutType.none } as PyOut)
         } else {
-          let fsOpsProgress: number = 0
-
           type ProgressData = {
             written: number
             total: number
             currentFilePos: number
             totalFilesCount: number
           }
-
-          let previousProgress: ProgressData | undefined
 
           // listen for operation output
           this.proc.stdout.addListener("data", (data: Buffer) => {
@@ -669,7 +665,7 @@ export class PyboardRunner extends EventEmitter {
                       jsonString.includes("!!Exception!!")
                     ) {
                       // avoid > and < checks for next file progress
-                      previousProgress = undefined
+                      //previousProgress = undefined
 
                       // should be done with care as there error could have
                       // only indicated a problem with something
@@ -678,7 +674,7 @@ export class PyboardRunner extends EventEmitter {
                       // which would cause this here to think the upload
                       // for a file failed but it actually succeeded
                       // that has been fixed but should be always kept in mind
-                      fsOpsProgress++
+                      //fsOpsProgress++
                       break
                     } else {
                       try {
@@ -691,24 +687,14 @@ export class PyboardRunner extends EventEmitter {
                           totalFilesCount,
                         } = progData
 
-                        if (previousProgress === undefined) {
-                          previousProgress = progData
-                        } else if (
-                          previousProgress?.written > written ||
-                          previousProgress?.total !== total
-                        ) {
-                          fsOpsProgress++
-                        }
+                        //const progress = Math.round((written / total) * 100)
 
-                        const progress = Math.round((written / total) * 100)
-
+                        // TODO: currentFilePos is not good for index as
+                        // the list is sorted in wrapper.py -> different order
                         follow?.(
-                          `'${command.args.files?.[fsOpsProgress]}' ` +
-                            `[${currentFilePos}/${totalFilesCount}]: ` +
-                            `${progress}%`
+                          `'${command.args.files?.[currentFilePos - 1]}' ` +
+                            `[${currentFilePos}/${totalFilesCount}]`
                         )
-
-                        previousProgress = progData
 
                         // clean-up buffer as current progress is not needed anymore
                         break

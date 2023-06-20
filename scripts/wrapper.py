@@ -93,11 +93,20 @@ def get_directories_to_create(file_paths):
 
 fsop_current_file_pos = -1
 fsop_total_files_count = -1
+fsop_last_pos = -1
 def fs_progress_callback(written: int, total: int):
+    global fsop_last_pos, fsop_current_file_pos
     if written == -1 and total == -1:
-        global fsop_current_file_pos
         fsop_current_file_pos += 1
         return
+    
+    # reduce prints so stdin buffer of parent does not get overloaded
+    # but now the progress % cannot be calculated by parent as it gets only notified by new file
+    #and written != total <- for a few more prints
+    if fsop_last_pos == fsop_current_file_pos:
+        return
+    fsop_last_pos = fsop_current_file_pos
+
     """
     Needs to be very fast, otherwise multiple json dumps could arrive at the same time at the parent process if files are small.
     """
@@ -194,7 +203,7 @@ class Wrapper:
             local (list[str]): The local paths to the files to upload.
             remote (str): The remote path to save the files relative to.
         """
-        global fsop_current_file_pos, fsop_total_files_count
+        global fsop_current_file_pos, fsop_total_files_count, fsop_last_pos
         
         if remote == None or remote == "":
             remote = ":"
@@ -243,6 +252,7 @@ class Wrapper:
                 pyboard.filesystem_command(self.pyb, ["cp"]+local+[remote])
         fsop_total_files_count = -1
         fsop_current_file_pos = -1
+        fsop_last_pos = -1
 
     def download_files(self, remote: list[str], local: str, verbose: bool = False):
         """Downloads (a) files from the pico.
@@ -251,7 +261,7 @@ class Wrapper:
             remote (str): The remote path to the file(s) to download splited by single space.
             local (str): The local path to save the file to or folder to save files to.
         """
-        global fsop_current_file_pos, fsop_total_files_count
+        global fsop_current_file_pos, fsop_total_files_count, fsop_last_pos
 
         fsop_total_files_count = len(remote)
 
@@ -290,6 +300,7 @@ class Wrapper:
                 pyboard.filesystem_command(self.pyb, ["cp"]+remote+[local])
         fsop_total_files_count = -1
         fsop_current_file_pos = -1
+        fsop_last_pos = -1
 
     def delete_files(self, files: list[str]):
         """Deletes (a) file(s) on the pico.
