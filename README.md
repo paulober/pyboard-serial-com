@@ -51,4 +51,4 @@ pyboardRunner.disconnect()
 ```
 
 ## Known issues
-- When running `input(...)` in a command it will return the inserted
+...
