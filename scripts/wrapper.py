@@ -347,9 +347,10 @@ class Wrapper:
         Args:
             path (str): The path to the file or folder to remove on the remote host.
         """
+        # load function into memory
         self.pyb.exec_raw(mpyFunctions.FC_IS_DIR)
 
-        ret, err = self.pyb.exec_raw(f"print('D' if __pico_is_dir('{path}') else 'F')")
+        ret, err = self.pyb.exec_raw(f"print('D' if {mpyFunctions.CALL_IS_DIR(path)} else 'F')")
         if err:
             print(ERR, flush=True)
         else:
@@ -362,7 +363,8 @@ class Wrapper:
             else:
                 pyboard.filesystem_command(self.pyb, ["rm", path])
 
-        self.pyb.exec_raw("del __pico_is_dir")
+        # clear memory
+        self.pyb.exec_raw(mpyFunctions.DEL_IS_DIR)
 
     def calc_file_hashes(self, files: list[str]):
         """Calculates the hashes of (a) file(s) on the pico.
@@ -370,34 +372,12 @@ class Wrapper:
         Args:
             files (list[str]): The path to the file(s) to calculate the hash of.
         """
-        hashes_script = """\
-import uhashlib
-import ubinascii
-import uos
-import ujson
-
-def hash_file(file):
-    try:
-        if uos.stat(file)[6] > 200 * 1024:
-            print(ujson.dumps({"file": file, "error": "File too large"}))
-            return
-        with open(file, 'rb') as f:
-            h = uhashlib.sha256()
-            while True:
-                data = f.read(512)
-                if not data:
-                    break
-                h.update(data)
-            print(ujson.dumps({"file": file, "hash": ubinascii.hexlify(h.digest()).decode()}))
-    except Exception as e:
-        print(ujson.dumps({"file": file, "error": f"{e.__class__.__name__}: {e}"}))
-"""
         # load function in ram on the pyboard
-        self.exec_cmd(hashes_script, False)
+        self.exec_cmd(mpyFunctions.FC_HASH_FILE, False)
         # call function for each file
         for file in files:
-            self.exec_cmd(f"hash_file('{file}')")
-        self.exec_cmd("del hash_file")
+            self.exec_cmd(mpyFunctions.CALL_HASH_FILE(file))
+        self.exec_cmd(mpyFunctions.DEL_HASH_FILE)
 
     def rename_item(self, old: str, new: str):
         """Renames a file / folder on the Pico (W).
@@ -407,8 +387,8 @@ def hash_file(file):
             new (str): The new/target path to the file / folder.
         """
         self.exec_cmd(mpyFunctions.FC_RENAME_ITEM)
-        self.exec_cmd(f"rename_file('{old}', '{new}')")
-        self.exec_cmd("del rename_file")
+        self.exec_cmd(mpyFunctions.CALL_RENAME_ITEM(old, new))
+        self.exec_cmd(mpyFunctions.DEL_RENAME_ITEM)
 
     def get_item_stat(self, item: str):
         """Gets the stat of (a) file(s) on the pico.
@@ -417,8 +397,8 @@ def hash_file(file):
             items (list[str]): The path to the file(s) to get the stat of.
         """
         self.exec_cmd(mpyFunctions.FC_GET_FILE_INFO)
-        self.exec_cmd(f"get_file_info('{item}')")
-        self.exec_cmd("del get_file_info")
+        self.exec_cmd(mpyFunctions.CALL_GET_FILE_INFO(item))
+        self.exec_cmd(mpyFunctions.DEL_GET_FILE_INFO)
 
     def exec_cmd(self, cmd: Union[str, bytes], follow: Optional[bool] = None, full_output: bool = False):
         """Executes a command on the pyboard.
@@ -491,13 +471,13 @@ def hash_file(file):
     def sync_rtc(self):
         """Syncs the RTC on the pyboard with the PC's RTC."""
         # exec without data_consumer, also to set it as fast as possible
-        _, err = self.pyb.exec_raw("\r"+mpyFunctions.FC_SYNC_RTC(datetime.now()))
+        _, err = self.pyb.exec_raw("\r"+mpyFunctions.EXEC_SYNC_RTC(datetime.now()))
         if err:
             print(ERR, flush=True)
 
     def get_rtc_time(self):
         """Gets the RTC time on the pyboard."""
-        ret, err = self.pyb.exec_raw("\r"+mpyFunctions.FC_GET_RTC_TIME)
+        ret, err = self.pyb.exec_raw("\r"+mpyFunctions.EXEC_GET_RTC_TIME)
         if err:
             print(ERR, flush=True)
         else:
