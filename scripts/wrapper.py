@@ -396,7 +396,8 @@ def hash_file(file):
         self.exec_cmd(hashes_script, False)
         # call function for each file
         for file in files:
-            self.exec_cmd(f"hash_file('{file}'); del hash_file")
+            self.exec_cmd(f"hash_file('{file}')")
+        self.exec_cmd("del hash_file")
 
     def rename_item(self, old: str, new: str):
         """Renames a file / folder on the Pico (W).
