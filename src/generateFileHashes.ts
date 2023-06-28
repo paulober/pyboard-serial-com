@@ -5,12 +5,13 @@ import { join, extname, relative } from "path"
 export interface ScanOptions {
   folderPath: string
   fileTypes: string[]
-  ignoredItems: string[]
+  ignoredWildcardItems: string[]
+  ignoredPaths: string[]
 }
 
 export function scanFolder(options: ScanOptions): Map<string, string> {
   const result = new Map<string, string>()
-  let { folderPath, fileTypes, ignoredItems } = options
+  let { folderPath, fileTypes, ignoredWildcardItems, ignoredPaths } = options
   fileTypes = fileTypes.map(item => (item[0] === "." ? item : `.${item}`))
 
   function scanDir(dir: string): void {
@@ -20,7 +21,10 @@ export function scanFolder(options: ScanOptions): Map<string, string> {
       const itemPath = join(dir, item)
 
       // Ignore items are file/folder names (not absolute or relative paths)
-      if (ignoredItems.includes(item)) {
+      if (
+        ignoredWildcardItems.includes(item) ||
+        ignoredPaths.includes(relative(folderPath, itemPath))
+      ) {
         continue
       }
 

@@ -1394,7 +1394,8 @@ export class PyboardRunner extends EventEmitter {
    *
    * @param projectFolder Root folder of the project to upload
    * @param fileTypes File types to upload. Empty array for all
-   * @param ignoredItems Items to ignore
+   * @param ignoredItems Items to ignore (`**\/<file>` or `**\/<folder>` to exclude this item name,
+   * or a relative path to exclude it directly)
    */
   public async startUploadingProject(
     projectFolder: string,
@@ -1407,10 +1408,12 @@ export class PyboardRunner extends EventEmitter {
       fileTypes,
       ignoredItems
     )*/
+
     const localHashes = scanFolder({
       folderPath: projectFolder,
-      fileTypes,
-      ignoredItems,
+      fileTypes: fileTypes,
+      ignoredWildcardItems: ignoredItems.filter(item => item.startsWith("**/")),
+      ignoredPaths: ignoredItems.filter(item => !item.startsWith("**/")),
     } as ScanOptions)
 
     // add localHashes to this.localFileHashes
