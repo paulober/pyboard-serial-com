@@ -1,0 +1,1 @@
+/* for rollup copy config to work */
