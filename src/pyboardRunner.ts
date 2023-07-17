@@ -727,7 +727,9 @@ export class PyboardRunner extends EventEmitter {
                         const progData: ProgressData = JSON.parse(jsonString)
 
                         const {
+                          // eslint-disable-next-line @typescript-eslint/no-unused-vars
                           written,
+                          // eslint-disable-next-line @typescript-eslint/no-unused-vars
                           total,
                           currentFilePos,
                           totalFilesCount,

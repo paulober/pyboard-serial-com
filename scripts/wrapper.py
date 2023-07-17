@@ -4,7 +4,6 @@ import sys
 import json
 import pyboard as pyboard
 import mpyFunctions
-import ast
 from utils import create_folder_structure, wrap_expressions_with_print, prepend_parent_directories
 import threading
 import time
@@ -12,6 +11,11 @@ import signal
 import platform
 from datetime import datetime
 from typing import Optional, Union
+
+if sys.version_info < (3, 9):
+    # Python versions earlier than 3.9
+    print("Python version is less than 3.9! Please upgrade to Python 3.9 or higher in order to use this script.")
+    sys.exit(2)
 
 EOO = "!!EOO!!"  # End of operation
 ERR = "!!ERR!!"  # Error
