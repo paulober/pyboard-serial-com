@@ -22,7 +22,7 @@ export function scanFolder(options: ScanOptions): Map<string, string> {
 
       // Ignore items are file/folder names (not absolute or relative paths)
       if (
-        ignoredWildcardItems.includes(item) ||
+        ignoredWildcardItems.includes("**/" + item) ||
         ignoredPaths.includes(relative(folderPath, itemPath))
       ) {
         continue
