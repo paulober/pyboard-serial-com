@@ -1,7 +1,7 @@
 {
   "name": "@paulober/pyboard-serial-com",
   "version": "2.0.0",
-  "description": "A simple library to communicate with the pyboard.py tool over serialport.",
+  "description": "A straightforward library for establishing communication with Raspberry Pi Pico (W) boards using the pyboard.py utility via the serial port.",
   "module": "./dist/index.mjs",
   "type": "module",
   "types": "./dist/index.d.ts",
@@ -23,7 +23,7 @@
   ],
   "minimumNodeVersion": 18,
   "scripts": {
-    "compile-wrapper": "cd scripts && python -m nuitka --standalone --onefile --assume-yes-for-downloads -o wrapper.bin wrapper.py",
+    "compile-wrapper": "cd scripts && python3 -m nuitka --standalone --onefile --assume-yes-for-downloads --disable-ccache -o wrapper.bin wrapper.py",
     "build": "rollup -c --environment BUILD:production",
     "compile-tests": "tsc --project tsconfig.tests.json && rollup -c ./scripts/rollup.config.copy.mjs --silent",
     "test": "npm run compile-tests && node ./dist/tests/index.js"

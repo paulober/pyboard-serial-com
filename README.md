@@ -1,8 +1,8 @@
 # pyboard-serial-com
 
-This project is a private nodejs package for a simple communication with the Raspberry Pi Pico and Pico W boards. It includes a wrapper for the `pyboard.py` tool from MicroPython and other helpers.
+A straightforward library for establishing communication with Raspberry Pi Pico (W) boards using the `pyboard.py` utility (from the MicroPython project) via the serial port.
 
-> This projects main/initial purpose is to offload the communication core and utilities from the [Pico-W-Go repo](https://github.com/paulober/Pico-W-Go) into a seperate repository for development and usability reasons. Also it is/was meant to replace the old ugly asynchronous mess of a communication piece to allow the developement of new more complex features based on the official `pyboard.py` module developed on the MicroPython repo.
+> This projects main/initial purpose is to offload the communication core and utilities from the [MicroPico repo](https://github.com/paulober/MicroPico) into a seperate repository for development and usability reasons. Also it is/was meant to replace the old ugly asynchronous mess of a communication piece to allow the developement of new more complex features based on the official `pyboard.py` module developed on the MicroPython repo.
 
 ## Installation
 
@@ -14,11 +14,19 @@ Or add this package to your `package.json` file:
 
 ```json
 "dependencies": {
-    "@paulober/pyboard-serial-com": "1.5.3"
+    "@paulober/pyboard-serial-com": "2.0.0"
 }
 ```
 
 NOTE: requires the scripts directory to be present in your work-/output directory
+
+## Supported platforms
+
+| Platform               | Architectures |
+| ---------------------- | ------------- |
+| Windows                | x64           |
+| Linux                  | x64, arm64    |
+| macOS (10.9 or higher) | x64, arm64    |
 
 ## Usage
 
@@ -43,12 +51,14 @@ const pyboardRunner = new PyboardRunner(
             console.error(`child process killed with signal ${signal}`)
         }
         console.debug("Done - exit")
-    },
-    "python.exe"
+    }
 )
 
 pyboardRunner.disconnect()
 ```
+
+## Planed changes
+- Maybe switch to RXJS compared to the current custom solution for queueing
 
 ## Known issues
 ...
