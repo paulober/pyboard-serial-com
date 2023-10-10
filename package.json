@@ -1,6 +1,6 @@
 {
   "name": "@paulober/pyboard-serial-com",
-  "version": "1.5.3",
+  "version": "2.0.0",
   "description": "A simple library to communicate with the pyboard.py tool over serialport.",
   "module": "./dist/index.mjs",
   "type": "module",
@@ -15,13 +15,14 @@
     "registry": "https://npm.pkg.github.com"
   },
   "files": [
-    "scripts/**.py",
+    "scripts/**.bin",
     "dist/*.mjs",
     "dist/*.map",
     "dist/*.d.ts"
   ],
-  "minimumNodeVersion": 16,
+  "minimumNodeVersion": 18,
   "scripts": {
+    "compile-wrapper": "cd scripts && python -m nuitka --standalone --onefile -o wrapper.bin wrapper.py",
     "build": "rollup -c --environment BUILD:production",
     "compile-tests": "tsc --project tsconfig.tests.json && rollup -c ./scripts/rollup.config.copy.mjs --silent",
     "test": "npm run compile-tests && node ./dist/tests/index.js"

@@ -138,9 +138,8 @@ export class PyboardRunner extends EventEmitter {
   private device: string
   private static readonly wrapperPyPath: string = join(
     getScriptsRoot(),
-    "wrapper.py"
+    "wrapper.bin"
   )
-  private pythonExe: string
 
   // parent
   private err: (data: Buffer | undefined) => void
@@ -162,20 +161,14 @@ export class PyboardRunner extends EventEmitter {
    * device
    * @param err The callback function to call when an error occurs (Buffer with error) or when a
    * connection to the device has been established (undefined parameter)
-   * @param pythonExe The path to the python executable.
    * For example: "python" on Windows or "python3" on Linux
    */
   constructor(
     device: string = "default",
     err: (data: Buffer | undefined) => void,
-    exit: (code: number, signal: string) => void,
-    pythonExe: string = "default"
+    exit: (code: number, signal: string) => void
   ) {
     super()
-
-    if (pythonExe === "default") {
-      pythonExe = process.platform === "win32" ? "python" : "python3"
-    }
 
     this.outBuffer = Buffer.alloc(0)
 
@@ -185,15 +178,14 @@ export class PyboardRunner extends EventEmitter {
 
     // spawn process
     this.device = device
-    this.pythonExe = pythonExe
 
     if (this.device !== "default") {
       console.debug(`[pyboard-serial-com] Connecting to ${this.device}`)
     }
 
     this.proc = spawn(
-      this.pythonExe,
-      [PyboardRunner.wrapperPyPath, "-d", this.device, "-b", "115200"],
+      PyboardRunner.wrapperPyPath,
+      ["-d", this.device, "-b", "115200"],
       {
         stdio: "pipe",
         windowsHide: true,
@@ -235,25 +227,14 @@ export class PyboardRunner extends EventEmitter {
   /**
    * Get the list of available serial ports of Picos connected to
    *
-   * @param pythonExe
    * @returns
    */
-  public static async getPorts(
-    pythonExe: string = "default"
-  ): Promise<PyOutPortsScan> {
-    if (pythonExe === "default") {
-      pythonExe = process.platform === "win32" ? "python" : "python3"
-    }
-
-    const proc = spawn(
-      pythonExe,
-      [PyboardRunner.wrapperPyPath, "--scan-ports"],
-      {
-        stdio: "pipe",
-        windowsHide: true,
-        cwd: getScriptsRoot(),
-      }
-    )
+  public static async getPorts(): Promise<PyOutPortsScan> {
+    const proc = spawn(PyboardRunner.wrapperPyPath, ["--scan-ports"], {
+      stdio: "pipe",
+      windowsHide: true,
+      cwd: getScriptsRoot(),
+    })
 
     return new Promise((resolve, reject) => {
       proc.stdout.on("data", (data: Buffer) => {
@@ -285,13 +266,7 @@ export class PyboardRunner extends EventEmitter {
    * Duplicate of the constructor!
    */
   private spawnNewProcess(listen = false): void {
-    const launchArgs = [
-      PyboardRunner.wrapperPyPath,
-      "-d",
-      this.device,
-      "-b",
-      "115200",
-    ]
+    const launchArgs = ["-d", this.device, "-b", "115200"]
     if (listen && this.followHardReset) {
       // to avoid Waiting seconds prompt, until device gets available
       //launchArgs.push("--delay")
@@ -299,7 +274,7 @@ export class PyboardRunner extends EventEmitter {
       launchArgs.push("--listen")
     }
 
-    this.proc = spawn(this.pythonExe, launchArgs, {
+    this.proc = spawn(PyboardRunner.wrapperPyPath, launchArgs, {
       stdio: "pipe",
       windowsHide: true,
       cwd: getScriptsRoot(),

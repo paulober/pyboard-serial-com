@@ -5,7 +5,7 @@ export default {
     plugins: [
         copy({
             targets: [
-                { src: 'scripts/*.py', dest: 'dist/scripts' },
+                { src: 'scripts/*.bin', dest: 'dist/scripts' },
             ],
             verbose: true
         })
