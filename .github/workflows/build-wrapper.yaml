@@ -29,7 +29,7 @@ jobs:
             - name: Compile wrapper binary
               # currently only amd64 runners are available
               run: |
-                cd pyboard-serial-com
+                cd scripts
                 python -m nuitka --standalone --onefile -o wrapper_${{ matrix.os }}_amd64.bin wrapper.py
 
             # upload wrapper_*.bin
