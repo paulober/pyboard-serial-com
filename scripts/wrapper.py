@@ -710,7 +710,7 @@ if __name__ == "__main__":
             print("\n".join(ports)+"\n"+EOO, flush=True)
 
             # exit the script after printing the ports to stdout
-            exit(0)
+            sys.exit(0)
 
         if args.device == "default":
             sys.exit(0x12F9)
@@ -800,7 +800,7 @@ if __name__ == "__main__":
 
             if line["command"] == "exit":
                 wrapper.pyb.close()
-                exit(0)
+                sys.exit(0)
 
             elif line["command"] == "status":
                 # not connection this will rais a serial exception
@@ -959,4 +959,4 @@ if __name__ == "__main__":
         print(er)
         sys.exit(1)
 
-    exit(0)
+    sys.exit(0)
