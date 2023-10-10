@@ -6,6 +6,7 @@ export default {
         copy({
             targets: [
                 { src: 'scripts/*.bin', dest: 'dist/scripts' },
+                { src: 'scripts/*.exe', dest: 'dist/scripts' },
             ],
             verbose: true
         })

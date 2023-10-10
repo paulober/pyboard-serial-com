@@ -126,16 +126,16 @@ function cleanBuffer(buffer: Buffer): string {
 
 function getWrapperName(): string {
   if (process.platform === "win32") {
-    return "wrapper_win32_x64.exe"
+    return "wrapper_win32_amd64.exe"
   } else if (process.platform === "darwin") {
     return process.arch === "arm64"
       ? "wrapper_macOS_arm64.bin"
-      : "wrapper_macOS_x64.bin"
+      : "wrapper_macOS_amd64.bin"
   } else {
     // linux
     return process.arch === "arm64"
       ? "wrapper_linux_arm64.bin"
-      : "wrapper_linux_x64.bin"
+      : "wrapper_linux_amd64.bin"
   }
 }
 
