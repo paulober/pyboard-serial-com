@@ -124,6 +124,21 @@ function cleanBuffer(buffer: Buffer): string {
     .replace("!!JSONDecodeError!!", "")
 }
 
+function getWrapperName(): string {
+  if (process.platform === "win32") {
+    return "wrapper_win32_x64.exe"
+  } else if (process.platform === "darwin") {
+    return process.arch === "arm64"
+      ? "wrapper_macOS_arm64.bin"
+      : "wrapper_macOS_x64.bin"
+  } else {
+    // linux
+    return process.arch === "arm64"
+      ? "wrapper_linux_arm64.bin"
+      : "wrapper_linux_x64.bin"
+  }
+}
+
 export class PyboardRunner extends EventEmitter {
   public proc: ChildProcessWithoutNullStreams
   private pipeConnected: boolean = false
@@ -138,7 +153,7 @@ export class PyboardRunner extends EventEmitter {
   private device: string
   private static readonly wrapperPyPath: string = join(
     getScriptsRoot(),
-    "wrapper.bin"
+    getWrapperName()
   )
 
   // parent

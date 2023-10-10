@@ -22,7 +22,7 @@
   ],
   "minimumNodeVersion": 18,
   "scripts": {
-    "compile-wrapper": "cd scripts && python -m nuitka --standalone --onefile -o wrapper.bin wrapper.py",
+    "compile-wrapper": "cd scripts && python -m nuitka --standalone --onefile --assume-yes-for-downloads -o wrapper.bin wrapper.py",
     "build": "rollup -c --environment BUILD:production",
     "compile-tests": "tsc --project tsconfig.tests.json && rollup -c ./scripts/rollup.config.copy.mjs --silent",
     "test": "npm run compile-tests && node ./dist/tests/index.js"
