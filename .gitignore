@@ -363,3 +363,5 @@ pyrightconfig.json
 .ionide
 
 # End of https://www.toptal.com/developers/gitignore/api/node,python,visualstudiocode,macos
+
+**/nuitka-crash-report.xml
