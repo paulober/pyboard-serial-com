@@ -25,9 +25,11 @@ jobs:
                 
             - name: Install pip packages
               run: python -m pip install -U setuptools pyserial nuitka
-            - name: Compile
+            - name: Compile wrapper binary
               # currently only amd64 runners are available
-              run: python -m nuitka --standalone --onefile -o wrapper_${{ matrix.os }}_amd64.bin wrapper.py
+              run: |
+                cd pyboard-serial-com
+                python -m nuitka --standalone --onefile -o wrapper_${{ matrix.os }}_amd64.bin wrapper.py
 
             # upload wrapper_*.bin
             - uses: actions/upload-artifact@v3
