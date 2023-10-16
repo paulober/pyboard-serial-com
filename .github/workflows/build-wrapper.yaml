@@ -26,14 +26,29 @@ jobs:
                 
             - name: Install pip packages
               run: python -m pip install -U setuptools pyserial nuitka
-            - name: Compile wrapper binary
+            - name: Compile wrapper binary (Non-Windows)
               # currently only amd64 runners are available
+              if: matrix.os != 'windows-latest'
               run: |
                 cd scripts
-                python -m nuitka --standalone --onefile --assume-yes-for-downloads -o wrapper_${{ matrix.os }}_amd64${{ matrix.os == 'windows-latest' && '.exe' || '.bin' }} wrapper.py
+                python -m nuitka --onefile --assume-yes-for-downloads -o wrapper_${{ matrix.os }}_amd64.bin wrapper.py
+
+            - name: Compile wrapper binary (Windows)
+              # currently only amd64 runners are available
+              if: matrix.os == 'windows-latest'
+              run: |
+                cd scripts
+                python -m nuitka --standalone --assume-yes-for-downloads -o wrapper_${{ matrix.os }}_amd64.exe wrapper.py
 
             # upload wrapper_*.bin
             - uses: actions/upload-artifact@v3
+              if: matrix.os != 'windows-latest'
               with:
-                name: wrapper_${{ matrix.os }}_amd64${{ matrix.os == 'windows-latest' && '.exe' || '.bin' }}
+                name: wrapper_${{ matrix.os }}_amd64.bin
                 path: ./scripts/wrapper_${{ matrix.os }}_amd64${{ matrix.os == 'windows-latest' && '.exe' || '.bin' }}
+
+            - uses: actions/upload-artifact@v3
+              if: matrix.os == 'windows-latest'
+              with:
+                name: wrapper_win32
+                path: ./scripts/wrapper_win32

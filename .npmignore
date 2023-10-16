@@ -7,6 +7,7 @@ tsconfig.json
 tsconfig.tests.json
 scripts/**
 !scripts/wrapper.bin
+!scripts/wrapper_win32/*
 src/
 examples/
 tools/

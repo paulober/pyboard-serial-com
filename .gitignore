@@ -367,3 +367,4 @@ pyrightconfig.json
 **/nuitka-crash-report.xml
 scripts/wrapper*.*
 !scripts/wrapper.py
+scripts/wrapper_win32

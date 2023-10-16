@@ -126,7 +126,7 @@ function cleanBuffer(buffer: Buffer): string {
 
 function getWrapperName(): string {
   if (process.platform === "win32") {
-    return "wrapper_win32_amd64.exe"
+    return join("wrapper_win32", "wrapper_win32_amd64.exe")
   } else if (process.platform === "darwin") {
     return process.arch === "arm64"
       ? "wrapper_macOS_arm64.bin"
@@ -151,6 +151,10 @@ export class PyboardRunner extends EventEmitter {
   private idCounter = 1
 
   private device: string
+  private static readonly wrapperPyWorkdirectory =
+    process.platform === "win32"
+      ? join(getScriptsRoot(), "wrapper_win32")
+      : getScriptsRoot()
   private static readonly wrapperPyPath: string = join(
     getScriptsRoot(),
     getWrapperName()
@@ -204,7 +208,7 @@ export class PyboardRunner extends EventEmitter {
       {
         stdio: "pipe",
         windowsHide: true,
-        cwd: getScriptsRoot(),
+        cwd: PyboardRunner.wrapperPyWorkdirectory,
       }
     )
 
@@ -248,7 +252,7 @@ export class PyboardRunner extends EventEmitter {
     const proc = spawn(PyboardRunner.wrapperPyPath, ["--scan-ports"], {
       stdio: "pipe",
       windowsHide: true,
-      cwd: getScriptsRoot(),
+      cwd: PyboardRunner.wrapperPyWorkdirectory,
     })
 
     return new Promise((resolve, reject) => {
@@ -292,7 +296,7 @@ export class PyboardRunner extends EventEmitter {
     this.proc = spawn(PyboardRunner.wrapperPyPath, launchArgs, {
       stdio: "pipe",
       windowsHide: true,
-      cwd: getScriptsRoot(),
+      cwd: PyboardRunner.wrapperPyWorkdirectory,
     })
 
     // Set the encoding for the subprocess stdin.
