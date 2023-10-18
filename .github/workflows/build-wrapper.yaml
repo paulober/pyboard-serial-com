@@ -27,24 +27,14 @@ jobs:
             - name: Install pip packages
               run: python -m pip install -U setuptools pyserial nuitka
 
-            - name: Set output_suffix
-              if: matrix.os != 'windows-latest'
-              id: set-output-suffix
-              run: |
-                if [[ "${{ matrix.os }}" == 'macos-latest' ]]; then
-                  echo "output_suffix=macOS_amd64" >> $GITHUB_ENV
-                else
-                  echo "output_suffix=linux_amd64" >> $GITHUB_ENV
-                fi
-
             # TODO: combine with the windows one
             - name: Compile wrapper binary (Non-Windows)
               # currently only amd64 runners are available
               if: matrix.os != 'windows-latest'
               run: |
                 cd scripts
-                python -m nuitka --standalone --assume-yes-for-downloads -o "wrapper_${{ steps.set-output-suffix.outputs.output_suffix }}.bin" wrapper.py
-                mv wrapper.dist "wrapper_${{ steps.set-output-suffix.outputs.output_suffix }}"
+                python -m nuitka --standalone --assume-yes-for-downloads -o wrapper_${{ matrix.os == 'macos-latest' && 'macOS_amd64' || 'linux_amd64' }}.bin wrapper.py
+                mv wrapper.dist wrapper_${{ matrix.os == 'macos-latest' && 'macOS_amd64' || 'linux_amd64' }}
 
             - name: Compile wrapper binary (Windows)
               # currently only amd64 runners are available
@@ -58,8 +48,8 @@ jobs:
             - uses: actions/upload-artifact@v3
               if: matrix.os != 'windows-latest'
               with:
-                name: wrapper_${{ steps.set-output-suffix.outputs.output_suffix }}
-                path: ./scripts/wrapper_${{ steps.set-output-suffix.outputs.output_suffix }}
+                name: wrapper_${{ matrix.os == 'macos-latest' && 'macOS_amd64' || 'linux_amd64' }}
+                path: ./scripts/wrapper_${{ matrix.os == 'macos-latest' && 'macOS_amd64' || 'linux_amd64' }}
 
             - uses: actions/upload-artifact@v3
               if: matrix.os == 'windows-latest'
