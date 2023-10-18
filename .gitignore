@@ -368,3 +368,5 @@ pyrightconfig.json
 scripts/wrapper*.*
 !scripts/wrapper.py
 scripts/wrapper_win32
+scripts/wrapper_macOS_*
+scripts/wrapper_linux_*

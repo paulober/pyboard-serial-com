@@ -26,12 +26,20 @@ jobs:
                 
             - name: Install pip packages
               run: python -m pip install -U setuptools pyserial nuitka
+
+            # TODO: combine with the windows one
             - name: Compile wrapper binary (Non-Windows)
               # currently only amd64 runners are available
               if: matrix.os != 'windows-latest'
               run: |
                 cd scripts
-                python -m nuitka --onefile --assume-yes-for-downloads -o wrapper_${{ matrix.os }}_amd64.bin wrapper.py
+                if [[ "${{ matrix.os }}" == 'macos-latest' ]]; then
+                  output_suffix="macOS_amd64"
+                else
+                  output_suffix="linux_amd64"
+                fi
+                python -m nuitka --standalone --assume-yes-for-downloads -o "wrapper_${output_suffix}.bin" wrapper.py
+                mv wrapper.dist wrapper_${output_suffix}
 
             - name: Compile wrapper binary (Windows)
               # currently only amd64 runners are available
@@ -44,8 +52,8 @@ jobs:
             - uses: actions/upload-artifact@v3
               if: matrix.os != 'windows-latest'
               with:
-                name: wrapper_${{ matrix.os }}_amd64.bin
-                path: ./scripts/wrapper_${{ matrix.os }}_amd64${{ matrix.os == 'windows-latest' && '.exe' || '.bin' }}
+                name: wrapper_${output_suffix}
+                path: ./scripts/wrapper_${output_suffix}
 
             - uses: actions/upload-artifact@v3
               if: matrix.os == 'windows-latest'

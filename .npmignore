@@ -6,8 +6,11 @@ rollup.config.mjs
 tsconfig.json
 tsconfig.tests.json
 scripts/**
-!scripts/wrapper.bin
 !scripts/wrapper_win32/*
+!scripts/wrapper_macOS_arm64/*
+!scripts/wrapper_macOS_amd64/*
+!scripts/wrapper_linux_arm64/*
+!scripts/wrapper_linux_amd64/*
 src/
 examples/
 tools/

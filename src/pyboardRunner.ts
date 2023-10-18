@@ -124,18 +124,34 @@ function cleanBuffer(buffer: Buffer): string {
     .replace("!!JSONDecodeError!!", "")
 }
 
+// TODO: simplify
+function getWrapperCwd(): string {
+  if (process.platform === "win32") {
+    return join(getScriptsRoot(), "wrapper_win32")
+  } else if (process.platform === "darwin") {
+    return process.arch === "arm64"
+      ? join(getScriptsRoot(), "wrapper_macOS_arm64")
+      : join(getScriptsRoot(), "wrapper_macOS_amd64")
+  } else {
+    // linux
+    return process.arch === "arm64"
+      ? join(getScriptsRoot(), "wrapper_linux_arm64")
+      : join(getScriptsRoot(), "wrapper_linux_amd64")
+  }
+}
+
 function getWrapperName(): string {
   if (process.platform === "win32") {
     return join("wrapper_win32", "wrapper_win32_amd64.exe")
   } else if (process.platform === "darwin") {
     return process.arch === "arm64"
-      ? "wrapper_macOS_arm64.bin"
-      : "wrapper_macOS_amd64.bin"
+      ? join("wrapper_macOS_arm64", "wrapper_macOS_arm64.bin")
+      : join("wrapper_macOS_amd64", "wrapper_macOS_amd64.bin")
   } else {
     // linux
     return process.arch === "arm64"
-      ? "wrapper_linux_arm64.bin"
-      : "wrapper_linux_amd64.bin"
+      ? join("wrapper_linux_arm64", "wrapper_linux_arm64.bin")
+      : join("wrapper_linux_amd64", "wrapper_linux_amd64.bin")
   }
 }
 
@@ -151,10 +167,7 @@ export class PyboardRunner extends EventEmitter {
   private idCounter = 1
 
   private device: string
-  private static readonly wrapperPyWorkdirectory =
-    process.platform === "win32"
-      ? join(getScriptsRoot(), "wrapper_win32")
-      : getScriptsRoot()
+  private static readonly wrapperPyWorkdirectory = getWrapperCwd()
   private static readonly wrapperPyPath: string = join(
     getScriptsRoot(),
     getWrapperName()
