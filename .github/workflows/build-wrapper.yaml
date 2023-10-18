@@ -52,6 +52,7 @@ jobs:
               run: |
                 cd scripts
                 python -m nuitka --standalone --assume-yes-for-downloads -o wrapper_${{ matrix.os }}_amd64.exe wrapper.py
+                mv wrapper.dist wrapper_win32
 
             # upload wrapper_*.bin
             - uses: actions/upload-artifact@v3
