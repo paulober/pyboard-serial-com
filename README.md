@@ -14,7 +14,7 @@ Or add this package to your `package.json` file:
 
 ```json
 "dependencies": {
-    "@paulober/pyboard-serial-com": "2.0.2"
+    "@paulober/pyboard-serial-com": "2.0.3"
 }
 ```
 
@@ -22,11 +22,11 @@ NOTE: requires the scripts directory to be present in your work-/output director
 
 ## Supported platforms
 
-| Platform               | Architectures |
-| ---------------------- | ------------- |
-| Windows                | x64           |
-| Linux                  | x64, arm64    |
-| macOS (10.9 or higher) | x64, arm64    |
+| Platform               | Architectures     |
+| ---------------------- | :---------------: |
+| Windows                | x64               |
+| Linux                  | x64, arm64, armhf |
+| macOS (10.9 or higher) | x64, arm64        |
 
 ## Usage
 
