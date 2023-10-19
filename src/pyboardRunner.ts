@@ -136,6 +136,8 @@ function getWrapperCwd(): string {
     // linux
     return process.arch === "arm64"
       ? join(getScriptsRoot(), "wrapper_linux_arm64")
+      : process.arch === "arm"
+      ? join(getScriptsRoot(), "wrapper_linux_armhf")
       : join(getScriptsRoot(), "wrapper_linux_amd64")
   }
 }
@@ -151,6 +153,8 @@ function getWrapperName(): string {
     // linux
     return process.arch === "arm64"
       ? join("wrapper_linux_arm64", "wrapper_linux_arm64.bin")
+      : process.arch === "arm"
+      ? join("wrapper_linux_armhf", "wrapper_linux_armhf.bin")
       : join("wrapper_linux_amd64", "wrapper_linux_amd64.bin")
   }
 }

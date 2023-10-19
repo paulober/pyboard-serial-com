@@ -19,6 +19,7 @@
     "scripts/wrapper_macOS_arm64/*",
     "scripts/wrapper_macOS_amd64/*",
     "scripts/wrapper_linux_arm64/*",
+    "scripts/wrapper_linux_armhf/*",
     "scripts/wrapper_linux_amd64/*",
     "dist/*.mjs",
     "dist/*.map",
