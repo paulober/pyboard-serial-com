@@ -27,7 +27,7 @@
   ],
   "minimumNodeVersion": 18,
   "scripts": {
-    "prepack": "chmod 644 scripts/wrapper*/* && chmod +x scripts/wrapper*/*.bin",
+    "prepack": "npm run build && chmod 644 scripts/wrapper*/* && chmod +x scripts/wrapper*/*.bin",
     "compile-wrapper": "cd scripts && python3 -m nuitka --standalone --assume-yes-for-downloads --disable-ccache -o wrapper.bin wrapper.py",
     "build": "rollup -c --environment BUILD:production",
     "compile-tests": "tsc --project tsconfig.tests.json && rollup -c ./scripts/rollup.config.copy.mjs --silent",
