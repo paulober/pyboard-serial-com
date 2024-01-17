@@ -13,7 +13,8 @@ import type {
 } from "../pyout.js"
 
 const pyboardRunner = new PyboardRunner(
-  "/dev/cu.usbmodem1101",
+  "/dev/cu.usbserial-0001",
+  115200,
   (data: Buffer | undefined) => {
     if (data !== undefined) {
       console.log(`stderr: ${data?.toString()}`)
@@ -30,8 +31,7 @@ const pyboardRunner = new PyboardRunner(
       console.debug(`child process killed with signal ${signal}`)
     }
     console.debug("Done - exit")
-  },
-  "python3"
+  }
 )
 
 function processStat(result: PyOut): void {
@@ -44,6 +44,10 @@ function processStat(result: PyOut): void {
     }
   }
 }
+
+process.stdin.on("data", async (data: Buffer) => {
+  await pyboardRunner.writeToPyboard(data.toString("utf-8"))
+})
 
 setTimeout(async () => {
   console.log("===== Adding all operations!")
@@ -77,7 +81,7 @@ setTimeout(async () => {
     const result = data as PyOutCommandWithResponse
     console.log(`Command result: ${result.response}`)
   }
-  data = await pyboardRunner.retrieveTabCompletion("uos.")
+  /*data = await pyboardRunner.retrieveTabCompletion("uos.")
   if (data.type === PyOutType.tabComp) {
     const result = data as PyOutTabComp
     console.log(
@@ -106,7 +110,70 @@ setTimeout(async () => {
         result.completion
     )
   }
-  exit(0)
+  data = await pyboardRunner.startUploadingProject(
+    "/Users/paulober/PicoDev/test",
+    ["py", "txt", "log", "json", "xml", "html", "js", "css", "mpy"],
+    [
+      ".picowgo",
+      ".vscode",
+      ".gitignore",
+      ".git",
+      "project.pico-go",
+      "env",
+      "venv",
+    ],
+    (data: string) => {
+      console.log("Follow: ", data)
+    }
+  )
+  /*data = await pyboardRunner.downloadProject(
+    "/Users/paulober/PicoDev/test/project-one",
+    data => {
+      console.log("Follow: ", data)
+    }
+  )*/
+  await pyboardRunner.deleteFolderRecursive("/")
+  data = await pyboardRunner.startUploadingProject(
+    "/Users/paulober/PicoDev/test/default-project",
+    //["py"],
+    //["sub/subi.py", "sub/sub3"],
+    ["py", "txt", "log", "json", "xml", "html", "js", "css", "mpy"],
+    [
+      "**/.picowgo",
+      "**/.micropico",
+      "**/.DS_Store",
+      "**/.picowgo",
+      "**/.vscode",
+      "**/.gitignore",
+      "**/.git",
+      "**/project.pico-go",
+      "**/env",
+      "**/venv",
+      "sub/subi.py",
+      "sub/sub3/thefiles5.py",
+    ],
+    (data: string) => {
+      console.log("Follow: ", data)
+    }
+  )
+  console.log("Upload/Download project result: " + JSON.stringify(data))
+  data = await pyboardRunner.listContents("/")
+  await listDataCp(data)
+  data = await pyboardRunner.listContents("/sub")
+  await listDataCp(data)
+  /*data = await pyboardRunner.sendCtrlD((data: string) => {
+    process.stdout.write(data)
+  })
+  console.log("Ctrl+D result: " + JSON.stringify(data))*/
+  /*data = await pyboardRunner.sendCtrlD((data: string) => {
+    //console.log(data)
+    process.stdout.write(data)
+  })
+  console.log("Ctrl+D result: " + JSON.stringify(data))*/
+  //data = await pyboardRunner.hardReset()
+  //console.log("Hard reset without follow result: " + JSON.stringify(data))
+
+  return
 
   const result123 = await pyboardRunner.softReset()
   console.log("Soft reset result: " + JSON.stringify(result123))
@@ -248,12 +315,13 @@ process.on("SIGINT", () => {
         const result = data as PyOutStatus
         console.log(`Download project status: ${result.status}`)
       }
-    })*/ /*
-
+    })*/
+/*
 // Friendly command test
-/*process.stdin.on("data", async (data: Buffer) => {
-      await pyboardRunner.writeToPyboard(data.toString("utf-8"))
-    })
+process.stdin.on("data", async (data: Buffer) => {
+  await pyboardRunner.writeToPyboard(data.toString("utf-8"))
+}) 
+/*
     //"a='asd'\na\n",
     //"a=0\nwhile a < 2:\n    b=input('Inp: ')\n    b\n    a+=1",
     pyboardRunner
@@ -269,8 +337,8 @@ process.on("SIGINT", () => {
           const result = data as PyOutCommandResult
           console.log(`Command result: ${result.result}`)
         }
-      })*/ /*
-
+      })*/
+/*
     pyboardRunner
       .runFile(
         "N:\\pyboard-serial-com\\scripts\\test\\im_test.py",

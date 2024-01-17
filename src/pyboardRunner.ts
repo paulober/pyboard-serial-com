@@ -171,6 +171,7 @@ export class PyboardRunner extends EventEmitter {
   private idCounter = 1
 
   private device: string
+  private baudRate: number
   private static readonly wrapperPyWorkdirectory = getWrapperCwd()
   private static readonly wrapperPyPath: string = join(
     getScriptsRoot(),
@@ -201,6 +202,7 @@ export class PyboardRunner extends EventEmitter {
    */
   constructor(
     device: string = "default",
+    baudRate: number,
     err: (data: Buffer | undefined) => void,
     exit: (code: number, signal: string) => void
   ) {
@@ -213,6 +215,7 @@ export class PyboardRunner extends EventEmitter {
     this.exit = exit
 
     // spawn process
+    this.baudRate = baudRate
     this.device = device
 
     if (this.device !== "default") {
@@ -221,7 +224,7 @@ export class PyboardRunner extends EventEmitter {
 
     this.proc = spawn(
       PyboardRunner.wrapperPyPath,
-      ["-d", this.device, "-b", "115200"],
+      ["-d", this.device, "-b", baudRate.toString()],
       {
         stdio: "pipe",
         windowsHide: true,
@@ -279,15 +282,23 @@ export class PyboardRunner extends EventEmitter {
           // kill child process
           proc.kill()
 
-          const dataStr = data
+          const dataStrs = data
             .toString("utf-8")
             .replaceAll("\r", "")
             .replace(EOO, "")
             .trim()
+            .split("\n")
+            .map(item => item.split(","))
 
           const resp: PyOutPortsScan = {
             type: PyOutType.portsScan,
-            ports: dataStr !== "" ? dataStr.split("\n") : [],
+            ports:
+              dataStrs.length > 0
+                ? dataStrs.map(item => ({
+                    port: item[0],
+                    baud: Number(item[1]),
+                  }))
+                : [],
           }
 
           resolve(resp)
@@ -302,7 +313,7 @@ export class PyboardRunner extends EventEmitter {
    * Duplicate of the constructor!
    */
   private spawnNewProcess(listen = false): void {
-    const launchArgs = ["-d", this.device, "-b", "115200"]
+    const launchArgs = ["-d", this.device, "-b", this.baudRate.toString()]
     if (listen && this.followHardReset) {
       // to avoid Waiting seconds prompt, until device gets available
       //launchArgs.push("--delay")

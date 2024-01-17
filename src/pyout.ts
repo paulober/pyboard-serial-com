@@ -41,7 +41,7 @@ export interface PyOutStatus extends PyOut {
 
 export interface PyOutPortsScan extends PyOut {
   type: PyOutType.portsScan
-  ports: string[]
+  ports: Array<{ port: string; baud: number }>
 }
 
 export interface PyOutGetItemStat extends PyOut {

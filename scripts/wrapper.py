@@ -22,7 +22,15 @@ ERR = "!!ERR!!"  # Error
 SIMPLE_AUTO_COMP = "!!SIMPLE_AUTO_COMP!!"  # Simple auto completion
 SUPPORTED_USB_PIDS: list[int] = [
     0x0005,  # Raspberry Pi Pico MicroPython firmware (CDC)
+    0xEA60,  # ESP32-WROOM
 ]
+BAUDRATES_BY_PID: dict[int, int] = {
+    # Raspberry Pi Pico MicroPython firmware (CDC)
+    0x0005: 115200,
+    # ESP32-WROOM
+    #0xEA60: 460800,
+    0xEA60: 115200,
+}
 
 try:
     # could use IOExcpetion but it checks if the serial module is installed
@@ -81,7 +89,7 @@ def find_pico_ports():
     """
     # TODO: maybe return more like the name or description of the device
     try:
-        return [port.device for port in list_ports.comports() if port.pid in SUPPORTED_USB_PIDS and port.vid == 0x2E8A]
+        return [(port.device, BAUDRATES_BY_PID[port.pid]) for port in list_ports.comports() if port.pid in SUPPORTED_USB_PIDS and port.vid in [0x2E8A, 0x10C4]]
     except Exception:
         devs = list_ports.comports()
         if len(devs) > 0:
@@ -707,7 +715,7 @@ if __name__ == "__main__":
             # print all at once so that when there are
             # many ports the parent don't have to buffer until it
             # has received EOO
-            print("\n".join(ports)+"\n"+EOO, flush=True)
+            print("\n".join(map(lambda x: str(f'{x[0]},{x[1]}'), ports))+"\n"+EOO, flush=True)
 
             # exit the script after printing the ports to stdout
             sys.exit(0)
