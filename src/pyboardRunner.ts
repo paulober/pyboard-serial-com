@@ -292,13 +292,7 @@ export class PyboardRunner extends EventEmitter {
 
           const resp: PyOutPortsScan = {
             type: PyOutType.portsScan,
-            ports:
-              dataStrs.length > 0
-                ? dataStrs.map(item => ({
-                    port: item[0],
-                    baud: Number(item[1]),
-                  }))
-                : [],
+            ports: dataStrs.length > 0 ? dataStrs.map(item => item[0]) : [],
           }
 
           resolve(resp)
