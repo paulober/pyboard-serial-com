@@ -23,6 +23,8 @@ SIMPLE_AUTO_COMP = "!!SIMPLE_AUTO_COMP!!"  # Simple auto completion
 SUPPORTED_USB_PIDS: list[int] = [
     0x0005,  # Raspberry Pi Pico MicroPython firmware (CDC)
     0xEA60,  # ESP32-WROOM
+    0x1001,  # ESP32-C3
+    0x9802,  # Teensy 4.0
 ]
 BAUDRATES_BY_PID: dict[int, int] = {
     # Raspberry Pi Pico MicroPython firmware (CDC)
@@ -30,6 +32,11 @@ BAUDRATES_BY_PID: dict[int, int] = {
     # ESP32-WROOM
     #0xEA60: 460800,
     0xEA60: 115200,
+    # ESP32-C3
+    0x303A: 115200,
+    # Teensy 4.0
+    0x9802: 115200,
+
 }
 
 try:
@@ -89,7 +96,7 @@ def find_pico_ports():
     """
     # TODO: maybe return more like the name or description of the device
     try:
-        return [(port.device, BAUDRATES_BY_PID[port.pid]) for port in list_ports.comports() if port.pid in SUPPORTED_USB_PIDS and port.vid in [0x2E8A, 0x10C4]]
+        return [(port.device, BAUDRATES_BY_PID[port.pid]) for port in list_ports.comports() if port.pid in SUPPORTED_USB_PIDS and port.vid in [0x2E8A, 0x10C4, 0x303A, 0xF055]]
     except Exception:
         devs = list_ports.comports()
         if len(devs) > 0:
