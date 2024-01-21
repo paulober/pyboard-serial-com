@@ -33,7 +33,7 @@ BAUDRATES_BY_PID: dict[int, int] = {
     #0xEA60: 460800,
     0xEA60: 115200,
     # ESP32-C3
-    0x303A: 115200,
+    0x1001: 115200,
     # Teensy 4.0
     0x9802: 115200,
 
