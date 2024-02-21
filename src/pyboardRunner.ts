@@ -162,6 +162,8 @@ function getWrapperName(): string {
 export class PyboardRunner extends EventEmitter {
   public proc: ChildProcessWithoutNullStreams
   private pipeConnected: boolean = false
+  /// Real bord connection status. (only updated by checkStatus!)
+  private boardConnected: boolean = false
   private outBuffer: Buffer
   // defines the output to the parent
   private processingOperation: boolean = false
@@ -452,8 +454,18 @@ export class PyboardRunner extends EventEmitter {
     console.log(`[pyboard-serial-com] onError: ${err.message}`)
   }
 
+  /**
+   * Can also be false positive durring connection atempts or similar.
+   */
   public isPipeConnected(): boolean {
     return this.pipeConnected
+  }
+
+  /**
+   * Real bord connection status. (only updated by checkStatus!).
+   */
+  public isBoardConnected(): boolean {
+    return this.boardConnected
   }
 
   /**
@@ -954,11 +966,22 @@ export class PyboardRunner extends EventEmitter {
                         !this.outBuffer.includes("Exception"),
                     } as PyOutStatus
 
+                    // only update in status check
+                    // so if a failure like exit/disconnect
+                    // happened, and boardConnected is true
+                    // you know it's a real disconnect after a board
+                    // was connected. checkStatus disables these so all
+                    // following discconectes/failures can be disregarded
+                    // as they are not real, just a result of failed
+                    // connection attempts or similar
+                    this.boardConnected = (opResult as PyOutStatus).status
+
                     break
                   } else if (data.includes("Exception")) {
                     // stop operation
                     this.operationOngoing = OperationType.none
                     this.onExit(3, "")
+                    this.boardConnected = false
 
                     opResult = {
                       type: PyOutType.status,

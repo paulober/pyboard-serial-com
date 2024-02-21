@@ -538,7 +538,7 @@ class Wrapper:
 
     def ctrl_d(self):
         """
-        Sends ctrl-c to the pyboard.
+        Sends ctrl-d to the pyboard.
         """
         self.pyb.exit_raw_repl()
         time.sleep(0.02)
