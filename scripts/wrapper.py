@@ -44,7 +44,6 @@ SUPPORTED_USB_PIDS: list[int] = [
     # WaveShare Pico
     0x1020,
     0x101F,
-    0x1020,
     0x1021,
     0x1086,
 ]
@@ -66,7 +65,6 @@ BAUDRATES_BY_PID: dict[int, int] = {
     # WaveShare Pico
     0x1020: 115200,
     0x101F: 115200,
-    0x1020: 115200,
     0x1021: 115200,
     0x1086: 115200,
 }
