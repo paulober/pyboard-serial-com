@@ -116,21 +116,21 @@ def sanitize_remote_v2(files: list[Optional[str]]) -> list[str]:
     return result
 
 
-def find_pico_ports():
+def find_pico_ports() -> list[tuple[str, int]]:
     """
     Returns a list of all connected Pico devices.
 
     (Assumes that the Pico is running the MicroPython firmware and is connected via USB)
-
-    0x2E8A is the vendor ID for Raspberry Pi
     """
     # TODO: maybe return more like the name or description of the device
     try:
         return [(port.device, BAUDRATES_BY_PID[port.pid]) for port in list_ports.comports() if port.pid in SUPPORTED_USB_PIDS and port.vid in SUPPORTED_USB_VIDS]
-    except Exception:
+    except KeyError:
         devs = list_ports.comports()
         if len(devs) > 0:
-            return [devs[0].device]
+            return [(devs[0].device, 115200)]
+        return []
+    except Exception:
         return []
 
 
@@ -166,7 +166,7 @@ def fs_progress_callback(written: int, total: int):
     print(f"{{\"written\": {written}, \"total\": {total}, \"currentFilePos\": {fsop_current_file_pos}, \"totalFilesCount\": {fsop_total_files_count}}}", flush=True)
 
 
-if platform.system() == "Windows":
+if platform.system().lower() == "windows":
     import msvcrt
 
     def clear_stdin():
