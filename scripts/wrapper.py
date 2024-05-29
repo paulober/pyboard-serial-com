@@ -11,6 +11,7 @@ import signal
 import platform
 from datetime import datetime
 from typing import Optional, Union
+import atexit
 
 if sys.version_info < (3, 9):
     # Python versions earlier than 3.9
@@ -744,8 +745,13 @@ if __name__ == "__main__":
 
         wrapper = Wrapper(args.device, args.baudrate)
 
+        ################################### CLEANUP ##################################
         # register a signal handler to responsible close the os handle for the port
+        # responsible for cleanup if the process is forced to exit
         signal.signal(signal.SIGINT, lambda s, f: wrapper.disconnect())
+        # responsible for cleanup if the process exits by itself
+        atexit.register(wrapper.disconnect)
+        ##############################################################################
 
         if args.listen:
             stop_event = threading.Event()
