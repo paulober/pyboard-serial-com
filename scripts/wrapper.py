@@ -34,6 +34,19 @@ SUPPORTED_USB_PIDS: list[int] = [
     0x7523,  # ESP32-WROOM-CH340
     0x1001,  # ESP32-C3
     0x9802,  # Teensy 4.0
+
+    # ESP32-S3 DevKits
+    0x7002,
+    0x7003,
+    0x7006,
+    0x7007,
+
+    # WaveShare Pico
+    0x1020,
+    0x101F,
+    0x1020,
+    0x1021,
+    0x1086,
 ]
 BAUDRATES_BY_PID: dict[int, int] = {
     # Raspberry Pi Pico MicroPython firmware (CDC)
@@ -46,7 +59,16 @@ BAUDRATES_BY_PID: dict[int, int] = {
     0x1001: 115200,
     # Teensy 4.0
     0x9802: 115200,
-
+    0x7002: 115200,
+    0x7003: 115200,
+    0x7006: 115200,
+    0x7007: 115200,
+    # WaveShare Pico
+    0x1020: 115200,
+    0x101F: 115200,
+    0x1020: 115200,
+    0x1021: 115200,
+    0x1086: 115200,
 }
 
 try:
