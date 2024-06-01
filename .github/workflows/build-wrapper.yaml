@@ -19,21 +19,20 @@ jobs:
             
         steps:
             - uses: actions/checkout@v4
-            - name: Set up Python 3.11
+            - name: Set up Python 3.12
               uses: actions/setup-python@v5
               with:
-                python-version: "3.11"
+                python-version: "3.12"
                 
             - name: Install pip packages
               run: python -m pip install -U setuptools pyserial nuitka
 
             # TODO: combine with the windows one
             - name: Compile wrapper binary (Non-Windows)
-              # currently only amd64 runners are available
               if: matrix.os != 'windows-latest'
               run: |
                 cd scripts
-                python -m nuitka --standalone --assume-yes-for-downloads -o wrapper_${{ matrix.os == 'macos-latest' && 'macOS_amd64' || 'linux_amd64' }}.bin wrapper.py
+                python -m nuitka --standalone --assume-yes-for-downloads --macos-target-arch=x86_64 -o wrapper_${{ matrix.os == 'macos-latest' && 'macOS_amd64' || 'linux_amd64' }}.bin wrapper.py
                 mv wrapper.dist wrapper_${{ matrix.os == 'macos-latest' && 'macOS_amd64' || 'linux_amd64' }}
 
             - name: Compile wrapper binary (Windows)
