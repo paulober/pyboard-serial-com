@@ -678,15 +678,14 @@ export class PyboardRunner extends EventEmitter {
                       .split("\n")) {
                       const parts: string[] = line.trimStart().split(" ")
 
-                      // TODO: maybe merge parts with index 2 and up
-                      // to support file names with spaces
-                      if (parts.length !== 2) {
+                      if (parts.length < 2) {
                         continue
                       }
+                      const filePath = parts.slice(1).join(" ")
 
                       const file: PyFileData = {
-                        path: parts[1],
-                        isDir: parts[1].endsWith("/"),
+                        path: filePath,
+                        isDir: filePath.endsWith("/"),
                         size: parseInt(parts[0]),
                       }
                       files.push(file)
