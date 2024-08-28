@@ -46,6 +46,7 @@ SUPPORTED_USB_PIDS: list[int] = [
     0x101F,
     0x1021,
     0x1086,
+    0x4001,  # WaveShare ESP32-S3-Pico
 ]
 BAUDRATES_BY_PID: dict[int, int] = {
     # Raspberry Pi Pico MicroPython firmware (CDC)
@@ -67,6 +68,7 @@ BAUDRATES_BY_PID: dict[int, int] = {
     0x101F: 115200,
     0x1021: 115200,
     0x1086: 115200,
+    0x4001: 115200,  # WaveShare ESP32-S3-Pico
 }
 
 try:
