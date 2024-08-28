@@ -40,7 +40,7 @@ jobs:
               if: matrix.os == 'windows-latest'
               run: |
                 cd scripts
-                python -m nuitka --standalone --assume-yes-for-downloads -o wrapper_${{ matrix.os }}_amd64.exe wrapper.py
+                python -m nuitka --standalone --assume-yes-for-downloads -o wrapper_win32_amd64.exe wrapper.py
                 mv wrapper.dist wrapper_win32
 
             # upload wrapper_*.bin

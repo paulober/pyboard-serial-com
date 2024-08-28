@@ -532,6 +532,7 @@ class Pyboard:
         self.exec_(cmd, data_consumer=stdout_write_bytes)
 
     # EDITED by paulober
+    # TODO: the else part should be run for dir and file, but this issues is already expected by some consumers
     def fs_ls_recursive(self, src):
         cmd = (
             "import uos\n"
