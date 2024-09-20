@@ -1,5 +1,7 @@
 # pyboard-serial-com
 
+> Deprecated, use [`pico-mpy-com`](https://github.com/paulober/pico-mpy-com) instead.
+
 A straightforward library for establishing communication with Raspberry Pi Pico (W) boards using the `pyboard.py` utility (from the MicroPython project) via the serial port.
 
 Now with experimental ESP32-WROOM, ESP32-S3, ESP32-C3, ESP32-S3-Pico and Teensy 4.0 support!
